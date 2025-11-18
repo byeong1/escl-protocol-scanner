@@ -42,7 +42,10 @@
         "clean": "rm -rf dist",
         "prepublishOnly": "yarn run build",
         "prepack": "yarn run build",
-        "postinstall": "node scripts/check-python-deps.js"
+        "postinstall": "node scripts/check-python-deps.js",
+        "publish:npm": "npm publish --access public",
+        "publish:github": "npm publish --registry https://npm.pkg.github.com --access public",
+        "publish:all": "npm version patch && npm run publish:npm && npm run publish:github"
     },
     "keywords": [
         "escl",
