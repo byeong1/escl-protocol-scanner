@@ -34,7 +34,7 @@ if not ZEROCONF_AVAILABLE or not PIL_AVAILABLE:
 
     print(json.dumps({
         'success': False,
-        'error': f'필수 라이브러리가 없습니다.\n설치: pip install {" ".join(missing)}'
+        'error': f'Required Python packages are not installed. Install with: pip install {" ".join(missing)}'
     }))
     sys.exit(1)
 
@@ -43,10 +43,10 @@ from escl_backend import ESCLBackend
 
 
 def main():
-    """eSCL 스캐너 서비스 메인 루프"""
+    """eSCL Scanner Service Main Loop"""
     try:
         backend = ESCLBackend()
-        print(f'[eSCL] 서비스 시작', file=sys.stderr, flush=True)
+        print(f'[eSCL] Service started', file=sys.stderr, flush=True)
 
         # stdin에서 명령어 읽기
         for line in sys.stdin:
@@ -59,7 +59,7 @@ def main():
                 command = json.loads(line)
                 action = command.get('action')
 
-                print(f'[eSCL] 명령 수신: {action}', file=sys.stderr, flush=True)
+                print(f'[eSCL] Command received: {action}', file=sys.stderr, flush=True)
 
                 if action == 'list':
                     # 스캐너 목록 조회
@@ -84,33 +84,33 @@ def main():
                     print(json.dumps(result), flush=True)
 
                 elif action == 'exit':
-                    # 종료
-                    print(json.dumps({'success': True, 'message': 'eSCL 서비스 종료'}), flush=True)
+                    # Exit service
+                    print(json.dumps({'success': True, 'message': 'eSCL service stopped'}), flush=True)
                     break
 
                 else:
-                    # 알 수 없는 명령
+                    # Unknown command
                     print(json.dumps({
                         'success': False,
-                        'error': f'알 수 없는 명령: {action}'
+                        'error': f'Unknown command: {action}'
                     }), flush=True)
 
             except json.JSONDecodeError as e:
                 print(json.dumps({
                     'success': False,
-                    'error': f'JSON 파싱 오류: {str(e)}'
+                    'error': f'JSON parsing error: {str(e)}'
                 }), flush=True)
 
             except Exception as e:
                 print(json.dumps({
                     'success': False,
-                    'error': f'명령 처리 오류: {str(e)}'
+                    'error': f'Command processing error: {str(e)}'
                 }), flush=True)
 
     except Exception as e:
         print(json.dumps({
             'success': False,
-            'error': f'eSCL 서비스 오류: {str(e)}'
+            'error': f'eSCL service error: {str(e)}'
         }), flush=True)
         sys.exit(1)
 

@@ -27,11 +27,10 @@ Compatible with network scanners from major manufacturers:
 
 ### Prerequisites
 - Node.js ≥ 14.0.0
-- Python 3.6+ with:
-  - `zeroconf` library
-  - `pillow` library
+- Python 3.6+
+- Python packages: `zeroconf`, `pillow`
 
-### Install with npm/yarn
+### Step 1: Install Package
 
 ```bash
 npm install @escl-protocol/scanner
@@ -39,10 +38,83 @@ npm install @escl-protocol/scanner
 yarn add @escl-protocol/scanner
 ```
 
-### Install Python Dependencies
+The postinstall script will:
+1. Check for required Python packages (`zeroconf`, `pillow`)
+2. **Interactively ask** if you want to install missing packages
+3. Install to the Python environment specified by `PYTHON_PATH` (or system python3)
+
+### Step 2: Setup Python Environment
+
+#### Option A: Using Virtual Environment (Recommended)
 
 ```bash
+# 1. Create virtual environment
+python3 -m venv venv
+
+# 2. Get absolute path to Python executable
+# Copy the full path (e.g., /Users/username/project/venv/bin/python3)
+python3 -c "import sys; print(sys.executable)"
+
+# 3. Install Python packages
+source venv/bin/activate
 pip install zeroconf pillow
+
+# 4. Set PYTHON_PATH using ABSOLUTE path (important!)
+# Use the full path from step 2, e.g.:
+export PYTHON_PATH=/Users/username/project/venv/bin/python3
+```
+
+⚠️ **Important**: Always use **absolute path** for `PYTHON_PATH`, not relative paths like `./venv/bin/python3`
+
+#### Option B: Using System Python
+
+```bash
+# Just ensure Python packages are installed
+pip3 install zeroconf pillow
+```
+
+## Runtime Configuration
+
+### Using Virtual Environment
+
+Set the `PYTHON_PATH` environment variable when running your application:
+
+```bash
+# Option 1: Export before running
+export PYTHON_PATH=./venv/bin/python3
+npm start
+
+# Option 2: One-liner
+PYTHON_PATH=./venv/bin/python3 npm start
+
+# Option 3: In package.json scripts
+{
+  "scripts": {
+    "start": "PYTHON_PATH=./venv/bin/python3 electron ."
+  }
+}
+```
+
+### Environment-Specific Setup
+
+Create separate `.env` files for different environments:
+
+```bash
+# .env.dev
+PYTHON_PATH=./venv-dev/bin/python3
+
+# .env.staging
+PYTHON_PATH=./venv-staging/bin/python3
+
+# .env.production
+PYTHON_PATH=/usr/local/bin/python3
+```
+
+Then activate the appropriate environment:
+
+```bash
+source .env.dev
+npm start
 ```
 
 ## Quick Start
@@ -182,6 +254,128 @@ if (images) {
   // images are base64-encoded PNG data
 }
 ```
+
+## Choosing Your Scanning Approach
+
+The library provides two different ways to perform scans, each with different use cases:
+
+### Low-Level API: `client.createScanJob()`
+
+**Use this when you need:**
+- Fine-grained control over the scanning process
+- Custom polling intervals or timeout logic
+- To handle batch scanning with specific error recovery
+- Advanced features like job cancellation
+
+**How it works:**
+1. Create scan job with parameters → returns Job ID
+2. Poll `getScanJobStatus()` to check completion
+3. Download each image with `downloadImage()`
+4. Manually manage job lifecycle
+
+**Example:**
+```typescript
+// Step 1: Create job
+const jobId = await client.createScanJob(scanner, 300, 'RGB24', 'Platen');
+
+// Step 2: Poll for completion with custom logic
+while (!completed) {
+  const status = await client.getScanJobStatus(scanner, jobId);
+
+  if (status.status === 'Completed') {
+    // Step 3: Download images
+    for (const imageUrl of status.images) {
+      const buffer = await client.downloadImage(scanner, imageUrl);
+      // Custom processing...
+    }
+    completed = true;
+  }
+
+  await new Promise(r => setTimeout(r, 1000)); // Custom delay
+}
+```
+
+**Pros:**
+- Maximum flexibility and control
+- Custom error handling strategies
+- Can implement custom polling logic
+- Direct access to job status
+
+**Cons:**
+- More code to write and maintain
+- More opportunities for bugs
+- Requires manual resource cleanup
+
+### High-Level API: `quickScan()`
+
+**Use this when you need:**
+- Simple one-shot scanning (most common case)
+- Fast implementation without boilerplate
+- Automatic error handling and cleanup
+- Sensible defaults for typical scanning scenarios
+
+**How it works:**
+1. Creates scan job automatically
+2. Waits and polls for completion (~5 second intervals)
+3. Downloads all images
+4. Saves to disk automatically
+5. Cleans up job automatically
+
+**Example:**
+```typescript
+const filePaths = await quickScan({
+  scanner: scanners[0],
+  dpi: 300,
+  mode: 'color',        // 'bw' | 'gray' | 'color'
+  source: 'Platen',     // 'Platen' | 'Feeder'
+  savePath: './scans'   // optional, defaults to cwd()
+});
+
+if (filePaths) {
+  console.log(`Scanned ${filePaths.length} images`);
+  filePaths.forEach(path => console.log(`  - ${path}`));
+}
+```
+
+**Pros:**
+- Minimal code required
+- Automatic cleanup on success/failure
+- Returns file paths ready for use
+- Built-in error handling
+- Best for simple scanning tasks
+
+**Cons:**
+- Less control over polling
+- Fixed timeout/retry logic
+- Cannot implement custom scanning workflows
+
+### Comparison Table
+
+| Feature | `createScanJob()` | `quickScan()` |
+|---------|-------------------|---------------|
+| **Typical Use** | Advanced, custom workflows | Simple one-shot scans |
+| **Code Required** | ~30+ lines | ~10 lines |
+| **Control Level** | Full | Limited |
+| **Error Handling** | Manual | Automatic |
+| **Cleanup** | Manual | Automatic |
+| **Polling Logic** | Custom | Built-in (~5s intervals) |
+| **Return Type** | Job ID (string) | File paths (string[]) |
+| **Learning Curve** | Moderate | Easy |
+| **Best For** | Integrations, batch jobs | Desktop apps, CLI tools |
+
+### Recommendation
+
+**Choose `quickScan()` unless you have specific reasons not to:**
+- It's the recommended approach for most use cases
+- Handles all the complexity automatically
+- Reduces bugs and improves maintainability
+- Perfect for Electron, CLI, and batch applications
+
+**Choose `createScanJob()` only if:**
+- You need custom polling behavior
+- Implementing a queue system
+- Building advanced scanning workflows
+- Integrating with custom error handling
 
 ## API Reference
 

@@ -166,3 +166,15 @@ export interface ProcessSpawnOptions {
   /** Environment variables for Python process */
   env?: NodeJS.ProcessEnv;
 }
+
+/**
+ * Scanner discovery response
+ */
+export interface DiscoveryResponse {
+  /** Operation success status */
+  success: boolean;
+  /** List of discovered scanners */
+  data: ESCLScanner[];
+  /** Error message if operation failed */
+  error?: string;
+}

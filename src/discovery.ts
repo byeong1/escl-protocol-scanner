@@ -5,7 +5,17 @@
 
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
-import { ESCLScanner, ESCLCommand, ESCLResponse } from './types';
+import * as fs from 'fs';
+import { execSync } from 'child_process';
+import { ESCLScanner, ESCLCommand, ESCLResponse, DiscoveryResponse } from './types';
+
+/**
+ * eSCL Scanner Discovery Service Options
+ */
+export interface ESCLDiscoveryOptions {
+  /** Custom Python executable path (e.g., /path/to/venv/bin/python3) */
+  pythonPath?: string;
+}
 
 /**
  * eSCL Scanner Discovery Service
@@ -17,28 +27,89 @@ export class ESCLDiscovery {
   private listeners: Set<(scanners: ESCLScanner[]) => void> = new Set();
   private timeout: number = 5000;
   private processReady: boolean = false;
+  private pythonPath: string = 'python3';
 
-  constructor(timeout?: number) {
+  constructor(timeout?: number, options?: ESCLDiscoveryOptions) {
     if (timeout) {
       this.timeout = timeout;
+    }
+    if (options?.pythonPath) {
+      this.pythonPath = options.pythonPath;
+    }
+  }
+
+  /**
+   * Validate Python path exists and is executable
+   * @throws Error if Python path is invalid
+   */
+  private validatePythonPath(): void {
+    // Check if it's an absolute path
+    if (path.isAbsolute(this.pythonPath)) {
+      if (!fs.existsSync(this.pythonPath)) {
+        throw new Error(
+          `Python executable not found at: ${this.pythonPath}\n` +
+          `Please ensure the Python virtual environment exists or provide a valid python3 path.`
+        );
+      }
+      return;
+    }
+
+    // For relative paths like './venv/bin/python3', check from current working directory
+    const resolvedPath = path.resolve(process.cwd(), this.pythonPath);
+    if (!fs.existsSync(resolvedPath)) {
+      throw new Error(
+        `Python executable not found at: ${resolvedPath}\n` +
+        `Current working directory: ${process.cwd()}\n` +
+        `Please ensure the Python virtual environment exists or provide a valid python3 path.`
+      );
     }
   }
 
   /**
    * Start discovering scanners
-   * @returns Promise resolving when discovery timeout completes
+   * @param timeout Optional timeout in milliseconds (default: 5000ms)
+   * @returns Promise resolving with discovery response containing success status and scanner data
    */
-  async startDiscovery(): Promise<ESCLScanner[]> {
+  async startDiscovery(timeout?: number): Promise<DiscoveryResponse> {
+    const discoveryTimeout = timeout || this.timeout;
+
     return new Promise((resolve, reject) => {
       try {
-        this.discovered.clear();
-        this.startPythonService();
+        // Validate Python path before proceeding
+        this.validatePythonPath();
 
-        // Send discovery command after short delay to ensure process is ready
-        const discoveryTimeout = setTimeout(() => {
-          this.stopDiscovery();
-          resolve(Array.from(this.discovered.values()));
-        }, this.timeout);
+        this.discovered.clear();
+        let resolved = false;
+
+        // Timeout fallback (in case Python doesn't respond)
+        const timeoutHandle = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            this.stopDiscovery();
+            const scanners = Array.from(this.discovered.values());
+            resolve({
+              success: true,
+              data: scanners
+            });
+          }
+        }, discoveryTimeout);
+
+        // Set up listener for Python response
+        const responseHandler = (scanners: ESCLScanner[]) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeoutHandle);
+            this.offScannerDiscovered(responseHandler);
+            this.stopDiscovery();
+            resolve({
+              success: true,
+              data: scanners
+            });
+          }
+        };
+
+        this.onScannerDiscovered(responseHandler);
+        this.startPythonService();
 
         // Send list command to Python subprocess
         if (this.pythonProcess && this.pythonProcess.stdin) {
@@ -91,7 +162,7 @@ export class ESCLDiscovery {
       // Get path to Python script relative to this module
       const pythonScriptPath = path.join(__dirname, '..', 'python', 'escl_main.py');
 
-      this.pythonProcess = spawn('python3', [pythonScriptPath], {
+      this.pythonProcess = spawn(this.pythonPath, [pythonScriptPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true
       });
@@ -104,7 +175,10 @@ export class ESCLDiscovery {
             for (const line of lines) {
               if (line.trim()) {
                 const response: ESCLResponse = JSON.parse(line);
-                if (response.success && response.scanners) {
+                if (!response.success && response.error) {
+                  // Handle error response from Python
+                  console.error('[eSCL Error]', response.error);
+                } else if (response.success && response.scanners) {
                   this.discovered.clear();
                   for (const scanner of response.scanners) {
                     this.discovered.set(scanner.name, scanner);
@@ -184,9 +258,9 @@ export class ESCLDiscovery {
 /**
  * Convenience function for quick scanner discovery
  * @param timeout Discovery timeout in milliseconds (default: 5000)
- * @returns Array of discovered scanners
+ * @returns Discovery response with success status and scanner data
  */
-export async function discoverScanners(timeout: number = 5000): Promise<ESCLScanner[]> {
+export async function discoverScanners(timeout: number = 5000): Promise<DiscoveryResponse> {
   const discovery = new ESCLDiscovery(timeout);
-  return discovery.startDiscovery();
+  return discovery.startDiscovery(timeout);
 }

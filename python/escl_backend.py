@@ -21,28 +21,28 @@ try:
 except ImportError as e:
     ESCL_AVAILABLE = False
 
-# eSCL 네임스페이스
+# eSCL namespaces
 ESCL_NS = "http://schemas.hp.com/imaging/escl/2011/05/03"
 PWG_NS = "http://www.pwg.org/schemas/2010/12/sm"
 
 
 class ESCLScannerListener(ServiceListener):
-    """eSCL 스캐너 검색 리스너"""
+    """eSCL Scanner Discovery Listener"""
 
     def __init__(self):
         self.scanners = []
 
     def add_service(self, zc: Zeroconf, type_: str, name: str) -> None:
-        """스캐너 발견 시 호출"""
-        print(f'[eSCL] 스캐너 감지: {name}', file=sys.stderr, flush=True)
+        """Called when a scanner is discovered"""
+        print(f'[eSCL] Scanner detected: {name}', file=sys.stderr, flush=True)
 
         info = zc.get_service_info(type_, name)
 
         if info and info.addresses:
-            # IPv4 주소 변환
+            # Convert IPv4 address
             host = ".".join(map(str, info.addresses[0]))
 
-            # mDNS 이름에서 서비스 타입 제거 (예: "Canon iR-ADV C3525._uscan._tcp.local." -> "Canon iR-ADV C3525")
+            # Remove service type from mDNS name (e.g., "Canon iR-ADV C3525._uscan._tcp.local." -> "Canon iR-ADV C3525")
             clean_name = name.split('._')[0] if '._' in name else name
 
             scanner_info = {
@@ -52,14 +52,14 @@ class ESCLScannerListener(ServiceListener):
                 'type': type_
             }
             self.scanners.append(scanner_info)
-            print(f'[eSCL] 추가됨: {clean_name} ({host}:{info.port})', file=sys.stderr, flush=True)
+            print(f'[eSCL] Scanner added: {clean_name} ({host}:{info.port})', file=sys.stderr, flush=True)
 
     def remove_service(self, zc: Zeroconf, type_: str, name: str) -> None:
-        """스캐너 제거 시 호출"""
-        print(f'[eSCL] 스캐너 제거: {name}', file=sys.stderr, flush=True)
+        """Called when a scanner is removed"""
+        print(f'[eSCL] Scanner removed: {name}', file=sys.stderr, flush=True)
 
     def update_service(self, zc: Zeroconf, type_: str, name: str) -> None:
-        """스캐너 업데이트 시 호출 (무시)"""
+        """Called when scanner information is updated (ignored)"""
         pass
 
 
@@ -68,22 +68,22 @@ class ESCLBackend(ScannerBackend):
 
     def __init__(self):
         if not ESCL_AVAILABLE:
-            raise ImportError('eSCL 라이브러리를 찾을 수 없습니다. 설치: pip install zeroconf pillow')
+            raise ImportError('eSCL libraries not found. Install with: pip install zeroconf pillow')
 
         self.discovered_scanners = []
 
     def get_capabilities(self, params):
-        """스캐너 capabilities 조회 및 파싱"""
+        """Retrieve and parse scanner capabilities"""
         try:
             scanner_name = params.get('scanner')
 
             if not scanner_name:
                 return {
                     'success': False,
-                    'error': '스캐너가 선택되지 않았습니다.'
+                    'error': 'No scanner selected'
                 }
 
-            # 선택된 스캐너 정보 찾기
+            # Find selected scanner information
             selected = None
             for s in self.discovered_scanners:
                 if s['name'] == scanner_name:
@@ -93,20 +93,20 @@ class ESCLBackend(ScannerBackend):
             if not selected:
                 return {
                     'success': False,
-                    'error': f'스캐너 정보를 찾을 수 없습니다: {scanner_name}'
+                    'error': f'Scanner information not found: {scanner_name}'
                 }
 
             host = selected['host']
             port = selected['port']
 
-            # Capabilities 조회
+            # Retrieve capabilities
             url = f"http://{host}:{port}/eSCL/ScannerCapabilities"
             response = urllib.request.urlopen(url, timeout=5)
             content = response.read()
 
             root = ET.fromstring(content)
 
-            # 지원하는 해상도 파싱
+            # Parse supported resolutions
             resolutions = []
             res_elements = root.findall('.//{%s}DiscreteResolution' % ESCL_NS)
             for res in res_elements:
@@ -114,25 +114,25 @@ class ESCLBackend(ScannerBackend):
                 if x_res is not None and x_res.text:
                     resolutions.append(int(x_res.text))
 
-            # 지원하는 색상 모드 파싱
+            # Parse supported color modes
             color_modes = []
             mode_elements = root.findall('.//{%s}ColorMode' % ESCL_NS)
             for mode in mode_elements:
                 if mode.text:
                     color_modes.append(mode.text)
 
-            # 입력 소스 확인 (Platen, Adf 지원 여부)
+            # Check input sources (Platen, Adf support)
             input_sources = []
             if root.find('.//{%s}Platen' % ESCL_NS) is not None:
                 input_sources.append('Platen')
             if root.find('.//{%s}Adf' % ESCL_NS) is not None:
                 input_sources.append('Adf')
 
-            # 중복 제거 및 정렬
+            # Remove duplicates and sort
             resolutions = sorted(list(set(resolutions)))
             color_modes = list(set(color_modes))
 
-            print(f'[eSCL] Capabilities 파싱 완료: resolutions={resolutions}, modes={color_modes}, sources={input_sources}', file=sys.stderr, flush=True)
+            print(f'[eSCL] Capabilities parsed: resolutions={resolutions}, modes={color_modes}, sources={input_sources}', file=sys.stderr, flush=True)
 
             return {
                 'success': True,
@@ -144,21 +144,21 @@ class ESCLBackend(ScannerBackend):
             }
 
         except Exception as e:
-            print(f'[eSCL] Capabilities 조회 오류: {str(e)}', file=sys.stderr, flush=True)
+            print(f'[eSCL] Capabilities retrieval error: {str(e)}', file=sys.stderr, flush=True)
             return {
                 'success': False,
-                'error': f'Capabilities 조회 실패: {str(e)}'
+                'error': f'Capabilities retrieval failed: {str(e)}'
             }
 
     def list_scanners(self):
-        """네트워크에서 eSCL 스캐너 검색"""
+        """Discover eSCL scanners on the network"""
         try:
-            print('[eSCL] 스캐너 검색 시작...', file=sys.stderr, flush=True)
+            print('[eSCL] Scanner discovery started...', file=sys.stderr, flush=True)
 
             zeroconf = Zeroconf()
             listener = ESCLScannerListener()
 
-            # eSCL 서비스 타입
+            # eSCL service types
             services = [
                 "_uscan._tcp.local.",
                 "_uscans._tcp.local."
@@ -166,18 +166,18 @@ class ESCLBackend(ScannerBackend):
 
             browsers = [ServiceBrowser(zeroconf, service, listener) for service in services]
 
-            # 5초 대기
+            # Wait 5 seconds for discovery
             time.sleep(5)
 
             zeroconf.close()
 
-            print(f'[eSCL] 발견: {len(listener.scanners)}개', file=sys.stderr, flush=True)
+            print(f'[eSCL] Discovery complete: {len(listener.scanners)} scanner(s) found', file=sys.stderr, flush=True)
 
-            # 검색 결과 저장
+            # Store discovery results
             self.discovered_scanners = listener.scanners
 
             if listener.scanners:
-                # 스캐너 전체 객체 반환 (name, host, port 포함)
+                # Return scanner objects (including name, host, port)
                 return {
                     'success': True,
                     'scanners': listener.scanners,
@@ -185,19 +185,20 @@ class ESCLBackend(ScannerBackend):
                 }
             else:
                 return {
-                    'success': False,
-                    'error': '네트워크 스캐너를 찾을 수 없습니다. WiFi 연결 및 스캐너 전원을 확인하세요.'
+                    'success': True,
+                    'scanners': [],
+                    'backend': 'eSCL'
                 }
 
         except Exception as e:
-            print(f'[eSCL] 오류: {str(e)}', file=sys.stderr, flush=True)
+            print(f'[eSCL] Error: {str(e)}', file=sys.stderr, flush=True)
             return {
                 'success': False,
-                'error': f'스캐너 검색 실패: {str(e)}'
+                'error': f'Scanner discovery failed: {str(e)}'
             }
 
     def scan(self, params):
-        """eSCL 프로토콜로 스캔 실행"""
+        """Execute scan via eSCL protocol"""
         try:
             scanner_name = params.get('scanner')
             dpi = params.get('dpi', 300)
@@ -207,10 +208,10 @@ class ESCLBackend(ScannerBackend):
             if not scanner_name:
                 return {
                     'success': False,
-                    'error': '스캐너가 선택되지 않았습니다.'
+                    'error': 'No scanner selected'
                 }
 
-            # 선택된 스캐너 정보 찾기
+            # Find selected scanner information
             selected = None
             for s in self.discovered_scanners:
                 if s['name'] == scanner_name:
@@ -220,88 +221,88 @@ class ESCLBackend(ScannerBackend):
             if not selected:
                 return {
                     'success': False,
-                    'error': f'스캐너 정보를 찾을 수 없습니다: {scanner_name}'
+                    'error': f'Scanner information not found: {scanner_name}'
                 }
 
             host = selected['host']
             port = selected['port']
 
-            print(f'[eSCL] 스캔 시작: {host}:{port}', file=sys.stderr, flush=True)
+            print(f'[eSCL] Scan started: {host}:{port}', file=sys.stderr, flush=True)
 
-            # 1. 스캐너 상태 확인
+            # 1. Check scanner status
             if not self._check_scanner_status(host, port):
                 return {
                     'success': False,
-                    'error': '스캐너가 준비되지 않았습니다.'
+                    'error': 'Scanner is not ready'
                 }
 
-            # 1.5. 스캐너 capabilities 확인 (지원하는 InputSource 확인)
+            # 1.5. Check scanner capabilities (verify supported InputSource)
             supported_sources = self._get_scanner_capabilities(host, port)
             if supported_sources:
-                print(f'[eSCL] 요청한 source: {source}, 지원: {supported_sources}', file=sys.stderr, flush=True)
+                print(f'[eSCL] Requested source: {source}, supported: {supported_sources}', file=sys.stderr, flush=True)
 
-            # 2. 스캔 작업 생성 (409 에러 발생 시 재시도)
+            # 2. Create scan job (retry if 409 error occurs)
             job_url = self._create_scan_job(host, port, dpi, mode, source)
 
-            # 409 Conflict 발생 시 기존 작업 정리 후 재시도
+            # If 409 Conflict occurs, cleanup existing job and retry
             if not job_url:
-                print('[eSCL] 409 에러 가능성 - 기존 작업 정리 시도', file=sys.stderr, flush=True)
-                # TODO: 기존 작업 목록 조회 및 삭제 로직 필요
+                print('[eSCL] Possible 409 error - attempting to cleanup existing jobs', file=sys.stderr, flush=True)
+                # TODO: Logic needed to retrieve and delete existing jobs
                 return {
                     'success': False,
-                    'error': '스캔 작업 생성 실패 - 스캐너를 재부팅해주세요'
+                    'error': 'Failed to create scan job - please restart the scanner'
                 }
 
             if not job_url:
                 return {
                     'success': False,
-                    'error': '스캔 작업 생성 실패'
+                    'error': 'Failed to create scan job'
                 }
 
-            # 3. 스캔 완료 대기 (5초)
-            print('[eSCL] 스캔 진행 중... (5초 대기)', file=sys.stderr, flush=True)
+            # 3. Wait for scan to complete (5 seconds)
+            print('[eSCL] Scan in progress... (waiting 5 seconds)', file=sys.stderr, flush=True)
             time.sleep(5)
 
-            # 4. 스캔 결과 다운로드 (ADF는 여러 페이지 가능)
+            # 4. Download scan results (ADF can have multiple pages)
             import os
             from datetime import datetime
 
-            # 저장 폴더 생성 (프로젝트 루트/scans)
+            # Create save directory (project_root/scans)
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
             save_dir = os.path.join(project_root, 'scans')
             os.makedirs(save_dir, exist_ok=True)
 
-            # 공통 타임스탬프 (동일 스캔 세션의 페이지들을 그룹화)
+            # Common timestamp (group pages from same scan session)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
             scanned_images = []
             saved_paths = []
             page_num = 1
 
-            # ADF 여부 확인
+            # Determine if ADF (automatic feeder)
             is_adf = (source == 'Feeder')
 
-            # 5. NextDocument 반복 호출 (ADF는 404 나올 때까지)
+            # 5. Call NextDocument repeatedly (until 404 for ADF)
             while True:
-                print(f'[eSCL] 페이지 {page_num} 다운로드 시도...', file=sys.stderr, flush=True)
+                print(f'[eSCL] Attempting to download page {page_num}...', file=sys.stderr, flush=True)
                 image_data = self._download_scan_result(job_url)
 
                 if not image_data:
-                    # 첫 페이지도 못 받았으면 에러
+                    # Error if first page not received
                     if page_num == 1:
                         self._delete_scan_job(job_url)
                         return {
                             'success': False,
-                            'error': '스캔 결과를 가져올 수 없습니다. 문서가 스캐너에 올려져 있는지 확인하세요.'
+                            'error': 'Cannot retrieve scan results. Please verify document is loaded in scanner.'
                         }
                     else:
-                        # 두 번째 페이지 이후 404는 정상 종료
-                        print(f'[eSCL] 스캔 완료: 총 {page_num - 1}페이지', file=sys.stderr, flush=True)
+                        # 404 after second page is normal completion
+                        print(f'[eSCL] Scan complete: {page_num - 1} total pages', file=sys.stderr, flush=True)
                         break
 
-                # 6. 이미지 저장 및 Base64 인코딩
+                # 6. Save image and Base64 encoding
                 try:
-                    # 파일명 생성 (페이지 번호 포함)
+                    # Generate filename (with page number)
                     if is_adf:
                         filename = f'scan_{timestamp}_page{page_num}.jpg'
                     else:
@@ -309,19 +310,19 @@ class ESCLBackend(ScannerBackend):
 
                     filepath = os.path.join(save_dir, filename)
 
-                    # 이미지 로드 및 회전 처리
+                    # Load image and handle rotation
                     img = Image.open(BytesIO(image_data))
-                    print(f'[eSCL] 페이지 {page_num} 원본 크기: {img.size[0]}x{img.size[1]}', file=sys.stderr, flush=True)
+                    print(f'[eSCL] Page {page_num} original size: {img.size[0]}x{img.size[1]}', file=sys.stderr, flush=True)
 
-                    # 반시계 방향 90도 회전
+                    # Rotate 90 degrees counter-clockwise
                     img = img.transpose(Image.ROTATE_90)
-                    print(f'[eSCL] 페이지 {page_num} 회전 후 크기: {img.size[0]}x{img.size[1]}', file=sys.stderr, flush=True)
+                    print(f'[eSCL] Page {page_num} size after rotation: {img.size[0]}x{img.size[1]}', file=sys.stderr, flush=True)
 
-                    # 회전된 이미지를 JPEG로 저장
+                    # Save rotated image as JPEG
                     img.save(filepath, format='JPEG', quality=95)
-                    print(f'[eSCL] 파일 저장: {filepath}', file=sys.stderr, flush=True)
+                    print(f'[eSCL] File saved: {filepath}', file=sys.stderr, flush=True)
 
-                    # PNG로 변환하여 Base64 인코딩 (프론트엔드 표시용)
+                    # Convert to PNG and Base64 encode (for frontend display)
                     buffer = BytesIO()
                     img.save(buffer, format='PNG')
                     encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
@@ -330,16 +331,16 @@ class ESCLBackend(ScannerBackend):
                     saved_paths.append(filepath)
 
                 except Exception as img_error:
-                    print(f'[eSCL] 페이지 {page_num} 이미지 처리 오류: {img_error}', file=sys.stderr, flush=True)
-                    # 실패해도 계속 진행
+                    print(f'[eSCL] Page {page_num} image processing error: {img_error}', file=sys.stderr, flush=True)
+                    # Continue even if processing fails
 
-                # Platen은 1페이지만, ADF는 계속 시도
+                # Platen only has 1 page, ADF continues to attempt
                 if not is_adf:
                     break
 
                 page_num += 1
 
-            # 7. 스캔 작업 삭제
+            # 7. Delete scan job
             self._delete_scan_job(job_url)
 
             return {
@@ -351,14 +352,14 @@ class ESCLBackend(ScannerBackend):
             }
 
         except Exception as e:
-            print(f'[eSCL] 스캔 오류: {str(e)}', file=sys.stderr, flush=True)
+            print(f'[eSCL] Scan error: {str(e)}', file=sys.stderr, flush=True)
             return {
                 'success': False,
-                'error': f'스캔 실패: {str(e)}'
+                'error': f'Scan failed: {str(e)}'
             }
 
     def _check_scanner_status(self, host, port):
-        """스캐너 상태 확인"""
+        """Check scanner status"""
         try:
             url = f"http://{host}:{port}/eSCL/ScannerStatus"
             response = urllib.request.urlopen(url, timeout=5)
@@ -368,17 +369,17 @@ class ESCLBackend(ScannerBackend):
             state = root.find('.//{%s}State' % PWG_NS)
 
             if state is not None and state.text == 'Idle':
-                print(f'[eSCL] 스캐너 준비됨', file=sys.stderr, flush=True)
+                print(f'[eSCL] Scanner ready', file=sys.stderr, flush=True)
                 return True
 
             return False
 
         except Exception as e:
-            print(f'[eSCL] 상태 확인 실패: {e}', file=sys.stderr, flush=True)
+            print(f'[eSCL] Status check failed: {e}', file=sys.stderr, flush=True)
             return False
 
     def _get_scanner_capabilities(self, host, port):
-        """스캐너 capabilities 조회 (지원하는 InputSource 확인)"""
+        """Retrieve scanner capabilities (verify supported InputSource)"""
         try:
             url = f"http://{host}:{port}/eSCL/ScannerCapabilities"
             response = urllib.request.urlopen(url, timeout=5)
@@ -388,25 +389,25 @@ class ESCLBackend(ScannerBackend):
 
             root = ET.fromstring(content)
 
-            # InputSource 찾기
+            # Find InputSource
             sources = root.findall('.//{%s}InputSource' % PWG_NS)
             if sources:
                 source_list = [s.text for s in sources if s.text]
-                print(f'[eSCL] 지원하는 InputSource: {source_list}', file=sys.stderr, flush=True)
+                print(f'[eSCL] Supported InputSource: {source_list}', file=sys.stderr, flush=True)
                 return source_list
 
             return []
 
         except Exception as e:
-            print(f'[eSCL] Capabilities 조회 실패: {e}', file=sys.stderr, flush=True)
+            print(f'[eSCL] Capabilities retrieval failed: {e}', file=sys.stderr, flush=True)
             return []
 
     def _create_scan_job(self, host, port, resolution, color_mode, input_source):
-        """스캔 작업 생성"""
+        """Create scan job"""
         try:
             url = f"http://{host}:{port}/eSCL/ScanJobs"
 
-            # 색상 모드 매핑
+            # Color mode mapping
             mode_map = {
                 'gray': 'Grayscale8',
                 'bw': 'BlackAndWhite1',
@@ -414,7 +415,7 @@ class ESCLBackend(ScannerBackend):
             }
             escl_mode = mode_map.get(color_mode, 'Grayscale8')
 
-            # eSCL 스캔 설정 XML (테스트 코드와 동일)
+            # eSCL scan settings XML (same as test code)
             scan_settings = f'''<?xml version="1.0" encoding="UTF-8"?>
 <scan:ScanSettings xmlns:scan="{ESCL_NS}" xmlns:pwg="{PWG_NS}">
     <pwg:Version>2.0</pwg:Version>
@@ -439,7 +440,7 @@ class ESCLBackend(ScannerBackend):
     <pwg:DocumentFormat>image/jpeg</pwg:DocumentFormat>
 </scan:ScanSettings>'''
 
-            print(f'[eSCL] 전송 XML:\n{scan_settings}', file=sys.stderr, flush=True)
+            print(f'[eSCL] Sending XML:\n{scan_settings}', file=sys.stderr, flush=True)
 
             data = scan_settings.encode('utf-8')
             req = urllib.request.Request(url, data=data, headers={'Content-Type': 'text/xml'})
@@ -448,90 +449,90 @@ class ESCLBackend(ScannerBackend):
             job_url = response.headers.get('Location')
 
             if job_url:
-                # Location이 상대 경로면 절대 경로로 변환
+                # Convert relative path to absolute path
                 if job_url.startswith('/'):
                     job_url = f"http://{host}:{port}{job_url}"
 
-                print(f'[eSCL] 작업 생성: {job_url}', file=sys.stderr, flush=True)
+                print(f'[eSCL] Job created: {job_url}', file=sys.stderr, flush=True)
                 return job_url
 
             return None
 
         except Exception as e:
-            print(f'[eSCL] 작업 생성 실패: {e}', file=sys.stderr, flush=True)
+            print(f'[eSCL] Job creation failed: {e}', file=sys.stderr, flush=True)
             return None
 
     def _download_scan_result(self, job_url, quiet=False):
-        """스캔 결과 다운로드"""
+        """Download scan result"""
         try:
             result_url = f"{job_url}/NextDocument"
 
             if not quiet:
-                print(f'[eSCL] 결과 다운로드 시도: {result_url}', file=sys.stderr, flush=True)
+                print(f'[eSCL] Attempting to download result: {result_url}', file=sys.stderr, flush=True)
 
             response = urllib.request.urlopen(result_url, timeout=10)
             content = response.read()
 
-            print(f'[eSCL] 다운로드 완료: {len(content)} bytes', file=sys.stderr, flush=True)
+            print(f'[eSCL] Download complete: {len(content)} bytes', file=sys.stderr, flush=True)
             return content
 
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                # 404는 아직 준비 안 됨 - 조용히 None 반환
+                # 404 means not ready yet - quietly return None
                 return None
             else:
                 if not quiet:
-                    print(f'[eSCL] 다운로드 실패: HTTP {e.code}', file=sys.stderr, flush=True)
+                    print(f'[eSCL] Download failed: HTTP {e.code}', file=sys.stderr, flush=True)
                 return None
         except Exception as e:
             if not quiet:
-                print(f'[eSCL] 다운로드 실패: {e}', file=sys.stderr, flush=True)
+                print(f'[eSCL] Download failed: {e}', file=sys.stderr, flush=True)
             return None
 
     def _check_job_status(self, job_url):
-        """스캔 작업 상태 확인"""
+        """Check scan job status"""
         try:
             response = urllib.request.urlopen(job_url, timeout=5)
             content = response.read()
 
-            # 디버깅: 첫 번째 응답만 출력
+            # Debug: only print first response
             if not hasattr(self, '_status_logged'):
-                print(f'[eSCL] 작업 상태 XML:\n{content.decode("utf-8")[:500]}', file=sys.stderr, flush=True)
+                print(f'[eSCL] Job status XML:\n{content.decode("utf-8")[:500]}', file=sys.stderr, flush=True)
                 self._status_logged = True
 
             root = ET.fromstring(content)
 
-            # JobState 찾기 (여러 네임스페이스 시도)
+            # Find JobState (try multiple namespaces)
             state = root.find('.//{%s}JobState' % PWG_NS)
             if state is None:
                 state = root.find('.//{%s}JobState' % ESCL_NS)
             if state is None:
-                # 네임스페이스 없이 시도
+                # Try without namespace
                 state = root.find('.//JobState')
 
             if state is not None and state.text:
-                print(f'[eSCL] 작업 상태: {state.text}', file=sys.stderr, flush=True)
+                print(f'[eSCL] Job status: {state.text}', file=sys.stderr, flush=True)
                 return state.text  # 'Pending', 'Processing', 'Completed', 'Aborted', 'Canceled'
 
-            print('[eSCL] JobState 태그를 찾을 수 없음', file=sys.stderr, flush=True)
+            print('[eSCL] JobState tag not found', file=sys.stderr, flush=True)
             return 'Unknown'
 
         except Exception as e:
-            # 상태 확인 실패
-            print(f'[eSCL] 상태 확인 실패: {e}', file=sys.stderr, flush=True)
+            # Status check failed
+            print(f'[eSCL] Status check failed: {e}', file=sys.stderr, flush=True)
             return 'Unknown'
 
     def _delete_scan_job(self, job_url):
-        """스캔 작업 삭제 (성공 시 스캐너가 자동 삭제하므로 실패해도 무방)"""
+        """Delete scan job (scanner auto-deletes on success, so errors are not critical)"""
         try:
             req = urllib.request.Request(job_url, method='DELETE')
             response = urllib.request.urlopen(req, timeout=10)
-            print(f'[eSCL] 작업 삭제 완료', file=sys.stderr, flush=True)
+            print(f'[eSCL] Job deletion complete', file=sys.stderr, flush=True)
             return True
 
         except Exception as e:
-            # 스캔 성공 시 스캐너가 자동으로 삭제하므로 404/500 에러는 정상
-            print(f'[eSCL] 작업 삭제 시도 (이미 삭제됨)', file=sys.stderr, flush=True)
+            # On successful scan, scanner auto-deletes, so 404/500 errors are normal
+            print(f'[eSCL] Job deletion attempted (already deleted)', file=sys.stderr, flush=True)
             return False
 
 

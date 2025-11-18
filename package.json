@@ -1,61 +1,66 @@
 {
-  "name": "@escl-protocol/scanner",
-  "version": "1.0.0",
-  "description": "eSCL/AirPrint Protocol Scanner Library - HTTP-based network scanner support with mDNS discovery",
-  "license": "MIT",
-  "author": "byeong1",
-  "homepage": "https://github.com/byeong1/escl-protocol-scanner",
-  "repository": {
-    "type": "git",
-    "url": "git@github.com:byeong1/escl-protocol-scanner.git"
-  },
-  "bugs": {
-    "url": "https://github.com/byeong1/escl-protocol-scanner/issues"
-  },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+    "name": "@crowsgear/escl-protocol-scanner",
+    "version": "1.0.0",
+    "description": "eSCL/AirPrint Protocol Scanner Library - HTTP-based network scanner support with mDNS discovery",
+    "license": "MIT",
+    "author": "CrowsGear",
+    "homepage": "https://github.com/byeong1/escl-protocol-scanner",
+    "repository": {
+        "type": "git",
+        "url": "git@github.com:byeong1/escl-protocol-scanner.git"
     },
-    "./types": {
-      "import": "./dist/types.js",
-      "types": "./dist/types.d.ts"
+    "bugs": {
+        "url": "https://github.com/byeong1/escl-protocol-scanner/issues"
     },
-    "./client": {
-      "import": "./dist/client.js",
-      "types": "./dist/client.d.ts"
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "require": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        },
+        "./types": {
+            "import": "./dist/types.js",
+            "types": "./dist/types.d.ts"
+        },
+        "./client": {
+            "import": "./dist/client.js",
+            "types": "./dist/client.d.ts"
+        }
+    },
+    "files": [
+        "dist",
+        "python",
+        "scripts",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsc",
+        "build:watch": "tsc --watch",
+        "clean": "rm -rf dist",
+        "prepublishOnly": "yarn run build",
+        "prepack": "yarn run build",
+        "postinstall": "node scripts/check-python-deps.js"
+    },
+    "keywords": [
+        "escl",
+        "scanner",
+        "airprint",
+        "network",
+        "mfp",
+        "printer",
+        "connection",
+        "auto connection",
+        "scanner auto connection"
+    ],
+    "engines": {
+        "node": ">=14.0.0"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@types/node": "^24.7.2",
+        "typescript": "^5.9.3"
     }
-  },
-  "files": [
-    "dist",
-    "python",
-    "README.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc --watch",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "yarn run build",
-    "prepack": "yarn run build"
-  },
-  "keywords": [
-    "escl",
-    "scanner",
-    "airprint",
-    "network",
-    "mfp",
-    "printer"
-  ],
-  "engines": {
-    "node": ">=14.0.0"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "@types/node": "^24.7.2",
-    "typescript": "^5.9.3"
-  }
 }

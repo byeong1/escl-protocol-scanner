@@ -22,15 +22,16 @@ export class ESCLClient {
   /**
    * Get scanner capabilities
    * @param scanner Target scanner
+   * @param debug Enable debug logging (default: false)
    * @returns Scanner capabilities
    */
-  async getCapabilities(scanner: ESCLScanner): Promise<ESCLCapabilities | null> {
+  async getCapabilities(scanner: ESCLScanner, debug: boolean = false): Promise<ESCLCapabilities | null> {
     try {
       const response = await this.httpGet(
         `http://${scanner.host}:${scanner.port}/eSCL/ScannerCapabilities`
       );
 
-      return this.parseCapabilities(response);
+      return this.parseCapabilities(response, debug);
     } catch (error) {
       console.error(`Failed to get capabilities for ${scanner.name}:`, error);
       return null;
@@ -125,44 +126,71 @@ export class ESCLClient {
    * Build eSCL scan settings XML
    */
   private buildScanSettings(dpi: number, colorMode: string, source: string): string {
+    // Match the Python implementation which uses proper namespaces
+    const ESCL_NS = 'http://schemas.hp.com/imaging/escl/2011/05/03';
+    const PWG_NS = 'http://www.pwg.org/schemas/2010/12/sm';
+
     return `<?xml version="1.0" encoding="UTF-8"?>
-<ScanSettings xmlns="http://schemas.hp.com/imaging/escl/2011/05/03">
-  <Version>2.5</Version>
-  <ScanRegions>
-    <ScanRegion>
-      <ContentRegionUnits>mms</ContentRegionUnits>
-      <ContentRegionXOffset>0</ContentRegionXOffset>
-      <ContentRegionYOffset>0</ContentRegionYOffset>
-      <ContentRegionWidth>210</ContentRegionWidth>
-      <ContentRegionHeight>297</ContentRegionHeight>
-    </ScanRegion>
-  </ScanRegions>
-  <InputSource>${source}</InputSource>
-  <ColorMode>${colorMode}</ColorMode>
-  <XResolution>${dpi}</XResolution>
-  <YResolution>${dpi}</YResolution>
-  <ChromaticityMode>Auto</ChromaticityMode>
-  <Brightness>0</Brightness>
-  <Contrast>0</Contrast>
-</ScanSettings>`;
+<scan:ScanSettings xmlns:scan="${ESCL_NS}" xmlns:pwg="${PWG_NS}">
+  <pwg:Version>2.0</pwg:Version>
+  <scan:Intent>Document</scan:Intent>
+  <pwg:ScanRegions>
+    <pwg:ScanRegion>
+      <pwg:ContentRegionUnits>escl:ThreeHundredthsOfInches</pwg:ContentRegionUnits>
+      <pwg:XOffset>0</pwg:XOffset>
+      <pwg:YOffset>0</pwg:YOffset>
+      <pwg:Width>3508</pwg:Width>
+      <pwg:Height>4961</pwg:Height>
+    </pwg:ScanRegion>
+  </pwg:ScanRegions>
+  <scan:Justification>
+    <pwg:XImagePosition>Center</pwg:XImagePosition>
+    <pwg:YImagePosition>Center</pwg:YImagePosition>
+  </scan:Justification>
+  <pwg:InputSource>${source}</pwg:InputSource>
+  <scan:ColorMode>${colorMode}</scan:ColorMode>
+  <scan:XResolution>${dpi}</scan:XResolution>
+  <scan:YResolution>${dpi}</scan:YResolution>
+  <pwg:DocumentFormat>image/jpeg</pwg:DocumentFormat>
+</scan:ScanSettings>`;
   }
 
   /**
    * Parse scanner capabilities from XML response
+   * @param xml XML response from scanner
+   * @param debug Enable debug logging (default: false)
    */
-  private parseCapabilities(xml: string): ESCLCapabilities {
+  private parseCapabilities(xml: string, debug: boolean = false): ESCLCapabilities {
     const resolutions: number[] = [];
     const colorModes: ('BlackAndWhite1' | 'Grayscale8' | 'RGB24')[] = [];
     const sources: ('Platen' | 'Adf' | 'Feeder')[] = [];
 
-    // Extract resolutions
-    const resolutionMatches = xml.matchAll(/<Res>(\d+)<\/Res>/g);
-    for (const match of resolutionMatches) {
+    // Debug: Print raw XML for inspection (only if debug enabled)
+    if (debug) {
+      console.log('[eSCL] Capabilities XML response (full):');
+      console.log(xml);
+    }
+
+    // eSCL uses XML namespaces, need to handle scan: and pwg: prefixes
+    // Extract resolutions - look for XResolution inside DiscreteResolution
+    const discreteResMatches = xml.matchAll(/<[a-z]*:?DiscreteResolution>[\s\S]*?<[a-z]*:?XResolution>(\d+)<\/[a-z]*:?XResolution>[\s\S]*?<\/[a-z]*:?DiscreteResolution>/g);
+    for (const match of discreteResMatches) {
       resolutions.push(parseInt(match[1], 10));
     }
 
-    // Extract color modes
-    const colorMatches = xml.matchAll(/<ColorMode>(\w+)<\/ColorMode>/g);
+    // Also try simpler pattern for XResolution
+    if (resolutions.length === 0) {
+      const xResMatches = xml.matchAll(/<[a-z]*:?XResolution>(\d+)<\/[a-z]*:?XResolution>/g);
+      for (const match of xResMatches) {
+        const res = parseInt(match[1], 10);
+        if (!resolutions.includes(res)) {
+          resolutions.push(res);
+        }
+      }
+    }
+
+    // Extract color modes - handle namespaced tags
+    const colorMatches = xml.matchAll(/<[a-z]*:?ColorMode>(\w+)<\/[a-z]*:?ColorMode>/g);
     for (const match of colorMatches) {
       const mode = match[1] as 'BlackAndWhite1' | 'Grayscale8' | 'RGB24';
       if (['BlackAndWhite1', 'Grayscale8', 'RGB24'].includes(mode)) {
@@ -170,8 +198,8 @@ export class ESCLClient {
       }
     }
 
-    // Extract sources
-    const sourceMatches = xml.matchAll(/<InputSource>(\w+)<\/InputSource>/g);
+    // Extract sources - look for InputSource tags or check for Platen/Adf elements
+    const sourceMatches = xml.matchAll(/<[a-z]*:?InputSource>(\w+)<\/[a-z]*:?InputSource>/g);
     for (const match of sourceMatches) {
       const source = match[1] as 'Platen' | 'Adf' | 'Feeder';
       if (['Platen', 'Adf', 'Feeder'].includes(source)) {
@@ -179,7 +207,26 @@ export class ESCLClient {
       }
     }
 
-    return { resolutions, colorModes, sources };
+    // If no InputSource tags found, check for Platen/Adf elements directly
+    if (sources.length === 0) {
+      if (/<[a-z]*:?Platen[\s>]/.test(xml)) {
+        sources.push('Platen');
+      }
+      if (/<[a-z]*:?Adf[\s>]/.test(xml)) {
+        sources.push('Adf');
+      }
+    }
+
+    // Remove duplicates from resolutions
+    const uniqueResolutions = Array.from(new Set(resolutions)).sort((a, b) => a - b);
+    const uniqueColorModes = Array.from(new Set(colorModes));
+    const uniqueSources = Array.from(new Set(sources));
+
+    if (debug) {
+      console.log('[eSCL] Parsed capabilities:', { resolutions: uniqueResolutions, colorModes: uniqueColorModes, sources: uniqueSources });
+    }
+
+    return { resolutions: uniqueResolutions, colorModes: uniqueColorModes, sources: uniqueSources };
   }
 
   /**
