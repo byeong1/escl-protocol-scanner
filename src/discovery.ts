@@ -258,9 +258,10 @@ export class ESCLDiscovery {
 /**
  * Convenience function for quick scanner discovery
  * @param timeout Discovery timeout in milliseconds (default: 5000)
+ * @param options Discovery options including pythonPath
  * @returns Discovery response with success status and scanner data
  */
-export async function discoverScanners(timeout: number = 5000): Promise<DiscoveryResponse> {
-  const discovery = new ESCLDiscovery(timeout);
+export async function discoverScanners(timeout: number = 5000, options?: ESCLDiscoveryOptions): Promise<DiscoveryResponse> {
+  const discovery = new ESCLDiscovery(timeout, options);
   return discovery.startDiscovery(timeout);
 }

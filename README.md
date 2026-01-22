@@ -4,31 +4,33 @@ A comprehensive TypeScript/Node.js library for discovering and communicating wit
 
 ## Features
 
-- 🔍 **Automatic Scanner Discovery**: Uses mDNS/Bonjour to discover eSCL-compatible scanners on the local network
-- 📡 **HTTP-based Communication**: eSCL protocol built on HTTP for reliable device communication
-- 🎨 **Multiple Color Modes**: Support for Black & White, Grayscale, and Full Color scanning
-- 📊 **Flexible Resolution**: Supports various DPI settings (150, 200, 300, 600 DPI, etc.)
-- 📄 **Multi-source Scanning**: Platen (flatbed) and ADF (Automatic Document Feeder) support
-- 📸 **Image Processing**: Automatic rotation correction and PNG encoding
-- 🔧 **Python Backend**: Uses Python subprocess for reliable mDNS discovery via zeroconf
-- ✨ **Production Ready**: Mature implementation from scanner-net project
+-   🔍 **Automatic Scanner Discovery**: Uses mDNS/Bonjour to discover eSCL-compatible scanners on the local network
+-   📡 **HTTP-based Communication**: eSCL protocol built on HTTP for reliable device communication
+-   🎨 **Multiple Color Modes**: Support for Black & White, Grayscale, and Full Color scanning
+-   📊 **Flexible Resolution**: Supports various DPI settings (150, 200, 300, 600 DPI, etc.)
+-   📄 **Multi-source Scanning**: Platen (flatbed) and ADF (Automatic Document Feeder) support
+-   📸 **Image Processing**: Automatic rotation correction and PNG encoding
+-   🔧 **Python Backend**: Uses Python subprocess for reliable mDNS discovery via zeroconf
+-   ✨ **Production Ready**: Mature implementation from scanner-net project
 
 ## Supported Devices
 
 Compatible with network scanners from major manufacturers:
-- **Canon**: iR-series MFP devices
-- **HP**: LaserJet MFP devices
-- **Xerox**: WorkCentre series
-- **Ricoh**: MP series
-- **Epson**: WorkForce Pro series
-- **And other AirPrint-compatible MFP devices**
+
+-   **Canon**: iR-series MFP devices
+-   **HP**: LaserJet MFP devices
+-   **Xerox**: WorkCentre series
+-   **Ricoh**: MP series
+-   **Epson**: WorkForce Pro series
+-   **And other AirPrint-compatible MFP devices**
 
 ## Installation
 
 ### Prerequisites
-- Node.js ≥ 14.0.0
-- Python 3.6+
-- Python packages: `zeroconf`, `pillow`
+
+-   Node.js ≥ 14.0.0
+-   Python 3.6+
+-   Python packages: `zeroconf`, `pillow`
 
 ### Step 1: Install Package
 
@@ -39,6 +41,7 @@ yarn add @escl-protocol/scanner
 ```
 
 The postinstall script will:
+
 1. Check for required Python packages (`zeroconf`, `pillow`)
 2. **Interactively ask** if you want to install missing packages
 3. Install to the Python environment specified by `PYTHON_PATH` (or system python3)
@@ -125,19 +128,19 @@ npm start
 import { discoverScanners, ESCLClient } from '@escl-protocol/scanner';
 
 async function example() {
-  // 1. Discover available scanners (5 second discovery window)
-  const scanners = await discoverScanners(5000);
-  console.log(`Found ${scanners.length} scanners`);
+    // 1. Discover available scanners (5 second discovery window)
+    const scanners = await discoverScanners(5000);
+    console.log(`Found ${scanners.length} scanners`);
 
-  if (scanners.length === 0) {
-    console.log('No scanners found on network');
-    return;
-  }
+    if (scanners.length === 0) {
+        console.log('No scanners found on network');
+        return;
+    }
 
-  // 2. Get scanner info
-  const scanner = scanners[0];
-  console.log(`Scanner: ${scanner.name}`);
-  console.log(`Host: ${scanner.host}:${scanner.port}`);
+    // 2. Get scanner info
+    const scanner = scanners[0];
+    console.log(`Scanner: ${scanner.name}`);
+    console.log(`Host: ${scanner.host}:${scanner.port}`);
 }
 
 example();
@@ -151,14 +154,14 @@ import { discoverScanners, ESCLScanner } from '@escl-protocol/scanner';
 // Quick discovery
 const scanners = await discoverScanners(5000);
 
-scanners.forEach(scanner => {
-  console.log(`${scanner.name} at ${scanner.host}:${scanner.port}`);
-  if (scanner.manufacturer) {
-    console.log(`  Manufacturer: ${scanner.manufacturer}`);
-  }
-  if (scanner.model) {
-    console.log(`  Model: ${scanner.model}`);
-  }
+scanners.forEach((scanner) => {
+    console.log(`${scanner.name} at ${scanner.host}:${scanner.port}`);
+    if (scanner.manufacturer) {
+        console.log(`  Manufacturer: ${scanner.manufacturer}`);
+    }
+    if (scanner.model) {
+        console.log(`  Model: ${scanner.model}`);
+    }
 });
 ```
 
@@ -172,9 +175,9 @@ const client = new ESCLClient();
 
 const capabilities = await client.getCapabilities(scanners[0]);
 if (capabilities) {
-  console.log('Supported Resolutions:', capabilities.resolutions);
-  console.log('Color Modes:', capabilities.colorModes);
-  console.log('Scan Sources:', capabilities.sources);
+    console.log('Supported Resolutions:', capabilities.resolutions);
+    console.log('Color Modes:', capabilities.colorModes);
+    console.log('Scan Sources:', capabilities.sources);
 }
 ```
 
@@ -188,15 +191,15 @@ const client = new ESCLClient();
 
 // Create scan job
 const jobId = await client.createScanJob(
-  scanners[0],
-  300,           // DPI (300 DPI)
-  'RGB24',       // Color mode (Full Color)
-  'Platen'       // Source (Flatbed)
+    scanners[0],
+    300, // DPI (300 DPI)
+    'RGB24', // Color mode (Full Color)
+    'Platen' // Source (Flatbed)
 );
 
 if (!jobId) {
-  console.error('Failed to create scan job');
-  process.exit(1);
+    console.error('Failed to create scan job');
+    process.exit(1);
 }
 
 // Poll for completion
@@ -204,31 +207,31 @@ let completed = false;
 let attempts = 0;
 
 while (!completed && attempts < 30) {
-  const status = await client.getScanJobStatus(scanners[0], jobId);
+    const status = await client.getScanJobStatus(scanners[0], jobId);
 
-  if (status.status === 'Completed') {
-    // Download images
-    for (const imageUrl of status.images) {
-      const imageBuffer = await client.downloadImage(scanners[0], imageUrl);
-      if (imageBuffer) {
-        console.log('Downloaded image:', imageBuffer.length, 'bytes');
-      }
+    if (status.status === 'Completed') {
+        // Download images
+        for (const imageUrl of status.images) {
+            const imageBuffer = await client.downloadImage(scanners[0], imageUrl);
+            if (imageBuffer) {
+                console.log('Downloaded image:', imageBuffer.length, 'bytes');
+            }
+        }
+        completed = true;
+    } else if (status.status === 'Aborted') {
+        console.error('Scan was aborted');
+        process.exit(1);
+    } else {
+        console.log(`Scan progress: ${status.status}`);
+        // Wait before next poll
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        attempts++;
     }
-    completed = true;
-  } else if (status.status === 'Aborted') {
-    console.error('Scan was aborted');
-    process.exit(1);
-  } else {
-    console.log(`Scan progress: ${status.status}`);
-    // Wait before next poll
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    attempts++;
-  }
 }
 
 if (!completed) {
-  console.error('Scan job timeout');
-  process.exit(1);
+    console.error('Scan job timeout');
+    process.exit(1);
 }
 ```
 
@@ -242,16 +245,16 @@ import { discoverScanners, quickScan } from '@escl-protocol/scanner';
 const scanners = await discoverScanners(5000);
 
 const images = await quickScan({
-  scanner: scanners[0],
-  dpi: 300,
-  mode: 'color',      // 'bw' | 'gray' | 'color'
-  source: 'Platen',   // 'Platen' | 'Feeder'
-  timeout: 30000
+    scanner: scanners[0],
+    dpi: 300,
+    mode: 'color', // 'bw' | 'gray' | 'color'
+    source: 'Platen', // 'Platen' | 'Feeder'
+    timeout: 30000,
 });
 
 if (images) {
-  console.log(`Scanned ${images.length} images`);
-  // images are base64-encoded PNG data
+    console.log(`Scanned ${images.length} images`);
+    // images are base64-encoded PNG data
 }
 ```
 
@@ -262,59 +265,66 @@ The library provides two different ways to perform scans, each with different us
 ### Low-Level API: `client.createScanJob()`
 
 **Use this when you need:**
-- Fine-grained control over the scanning process
-- Custom polling intervals or timeout logic
-- To handle batch scanning with specific error recovery
-- Advanced features like job cancellation
+
+-   Fine-grained control over the scanning process
+-   Custom polling intervals or timeout logic
+-   To handle batch scanning with specific error recovery
+-   Advanced features like job cancellation
 
 **How it works:**
+
 1. Create scan job with parameters → returns Job ID
 2. Poll `getScanJobStatus()` to check completion
 3. Download each image with `downloadImage()`
 4. Manually manage job lifecycle
 
 **Example:**
+
 ```typescript
 // Step 1: Create job
 const jobId = await client.createScanJob(scanner, 300, 'RGB24', 'Platen');
 
 // Step 2: Poll for completion with custom logic
 while (!completed) {
-  const status = await client.getScanJobStatus(scanner, jobId);
+    const status = await client.getScanJobStatus(scanner, jobId);
 
-  if (status.status === 'Completed') {
-    // Step 3: Download images
-    for (const imageUrl of status.images) {
-      const buffer = await client.downloadImage(scanner, imageUrl);
-      // Custom processing...
+    if (status.status === 'Completed') {
+        // Step 3: Download images
+        for (const imageUrl of status.images) {
+            const buffer = await client.downloadImage(scanner, imageUrl);
+            // Custom processing...
+        }
+        completed = true;
     }
-    completed = true;
-  }
 
-  await new Promise(r => setTimeout(r, 1000)); // Custom delay
+    await new Promise((r) => setTimeout(r, 1000)); // Custom delay
 }
 ```
 
 **Pros:**
-- Maximum flexibility and control
-- Custom error handling strategies
-- Can implement custom polling logic
-- Direct access to job status
+
+-   Maximum flexibility and control
+-   Custom error handling strategies
+-   Can implement custom polling logic
+-   Direct access to job status
 
 **Cons:**
-- More code to write and maintain
-- More opportunities for bugs
-- Requires manual resource cleanup
+
+-   More code to write and maintain
+-   More opportunities for bugs
+-   Requires manual resource cleanup
 
 ### High-Level API: `quickScan()`
 
 **Use this when you need:**
-- Simple one-shot scanning (most common case)
-- Fast implementation without boilerplate
-- Automatic error handling and cleanup
-- Sensible defaults for typical scanning scenarios
+
+-   Simple one-shot scanning (most common case)
+-   Fast implementation without boilerplate
+-   Automatic error handling and cleanup
+-   Sensible defaults for typical scanning scenarios
 
 **How it works:**
+
 1. Creates scan job automatically
 2. Waits and polls for completion (~5 second intervals)
 3. Downloads all images
@@ -322,83 +332,90 @@ while (!completed) {
 5. Cleans up job automatically
 
 **Example:**
+
 ```typescript
 const filePaths = await quickScan({
-  scanner: scanners[0],
-  dpi: 300,
-  mode: 'color',        // 'bw' | 'gray' | 'color'
-  source: 'Platen',     // 'Platen' | 'Feeder'
-  savePath: './scans'   // optional, defaults to cwd()
+    scanner: scanners[0],
+    dpi: 300,
+    mode: 'color', // 'bw' | 'gray' | 'color'
+    source: 'Platen', // 'Platen' | 'Feeder'
+    savePath: './scans', // optional, defaults to cwd()
 });
 
 if (filePaths) {
-  console.log(`Scanned ${filePaths.length} images`);
-  filePaths.forEach(path => console.log(`  - ${path}`));
+    console.log(`Scanned ${filePaths.length} images`);
+    filePaths.forEach((path) => console.log(`  - ${path}`));
 }
 ```
 
 **Pros:**
-- Minimal code required
-- Automatic cleanup on success/failure
-- Returns file paths ready for use
-- Built-in error handling
-- Best for simple scanning tasks
+
+-   Minimal code required
+-   Automatic cleanup on success/failure
+-   Returns file paths ready for use
+-   Built-in error handling
+-   Best for simple scanning tasks
 
 **Cons:**
-- Less control over polling
-- Fixed timeout/retry logic
-- Cannot implement custom scanning workflows
+
+-   Less control over polling
+-   Fixed timeout/retry logic
+-   Cannot implement custom scanning workflows
 
 ### Comparison Table
 
-| Feature | `createScanJob()` | `quickScan()` |
-|---------|-------------------|---------------|
-| **Typical Use** | Advanced, custom workflows | Simple one-shot scans |
-| **Code Required** | ~30+ lines | ~10 lines |
-| **Control Level** | Full | Limited |
-| **Error Handling** | Manual | Automatic |
-| **Cleanup** | Manual | Automatic |
-| **Polling Logic** | Custom | Built-in (~5s intervals) |
-| **Return Type** | Job ID (string) | File paths (string[]) |
-| **Learning Curve** | Moderate | Easy |
-| **Best For** | Integrations, batch jobs | Desktop apps, CLI tools |
+| Feature            | `createScanJob()`          | `quickScan()`            |
+| ------------------ | -------------------------- | ------------------------ |
+| **Typical Use**    | Advanced, custom workflows | Simple one-shot scans    |
+| **Code Required**  | ~30+ lines                 | ~10 lines                |
+| **Control Level**  | Full                       | Limited                  |
+| **Error Handling** | Manual                     | Automatic                |
+| **Cleanup**        | Manual                     | Automatic                |
+| **Polling Logic**  | Custom                     | Built-in (~5s intervals) |
+| **Return Type**    | Job ID (string)            | File paths (string[])    |
+| **Learning Curve** | Moderate                   | Easy                     |
+| **Best For**       | Integrations, batch jobs   | Desktop apps, CLI tools  |
 
 ### Recommendation
 
 **Choose `quickScan()` unless you have specific reasons not to:**
-- It's the recommended approach for most use cases
-- Handles all the complexity automatically
-- Reduces bugs and improves maintainability
-- Perfect for Electron, CLI, and batch applications
+
+-   It's the recommended approach for most use cases
+-   Handles all the complexity automatically
+-   Reduces bugs and improves maintainability
+-   Perfect for Electron, CLI, and batch applications
 
 **Choose `createScanJob()` only if:**
-- You need custom polling behavior
-- Implementing a queue system
-- Building advanced scanning workflows
-- Integrating with custom error handling
+
+-   You need custom polling behavior
+-   Implementing a queue system
+-   Building advanced scanning workflows
+-   Integrating with custom error handling
 
 ## API Reference
 
 ### Types
 
 #### `ESCLScanner`
+
 ```typescript
 interface ESCLScanner {
-  name: string;              // Scanner display name
-  host: string;              // IP address
-  port: number;              // HTTP port (usually 80)
-  serviceName?: string;      // Full mDNS service name
-  model?: string;            // Device model (if available)
-  manufacturer?: string;     // Device manufacturer (if available)
+    name: string; // Scanner display name
+    host: string; // IP address
+    port: number; // HTTP port (usually 80)
+    serviceName?: string; // Full mDNS service name
+    model?: string; // Device model (if available)
+    manufacturer?: string; // Device manufacturer (if available)
 }
 ```
 
 #### `ESCLCapabilities`
+
 ```typescript
 interface ESCLCapabilities {
-  resolutions: number[];                                    // Available DPI values
-  colorModes: ('BlackAndWhite1' | 'Grayscale8' | 'RGB24')[]; // Available color modes
-  sources: ('Platen' | 'Adf' | 'Feeder')[];               // Available scan sources
+    resolutions: number[]; // Available DPI values
+    colorModes: ('BlackAndWhite1' | 'Grayscale8' | 'RGB24')[]; // Available color modes
+    sources: ('Platen' | 'Adf' | 'Feeder')[]; // Available scan sources
 }
 ```
 
@@ -410,12 +427,12 @@ Main client for communicating with eSCL scanners.
 
 ```typescript
 class ESCLClient {
-  constructor(timeout?: number);
+    constructor(timeout?: number);
 
-  async getCapabilities(scanner: ESCLScanner): Promise<ESCLCapabilities | null>;
-  async createScanJob(scanner: ESCLScanner, dpi: number, colorMode: string, source: string): Promise<string | null>;
-  async getScanJobStatus(scanner: ESCLScanner, jobId: string): Promise<{ status: string; images: string[] }>;
-  async downloadImage(scanner: ESCLScanner, imageUrl: string): Promise<Buffer | null>;
+    async getCapabilities(scanner: ESCLScanner): Promise<ESCLCapabilities | null>;
+    async createScanJob(scanner: ESCLScanner, dpi: number, colorMode: string, source: string): Promise<string | null>;
+    async getScanJobStatus(scanner: ESCLScanner, jobId: string): Promise<{ status: string; images: string[] }>;
+    async downloadImage(scanner: ESCLScanner, imageUrl: string): Promise<Buffer | null>;
 }
 ```
 
@@ -425,13 +442,13 @@ Scanner discovery service using Python subprocess with zeroconf.
 
 ```typescript
 class ESCLDiscovery {
-  constructor(timeout?: number);
+    constructor(timeout?: number);
 
-  async startDiscovery(): Promise<ESCLScanner[]>;
-  stopDiscovery(): void;
-  getScanners(): ESCLScanner[];
-  onScannerDiscovered(callback: (scanners: ESCLScanner[]) => void): void;
-  offScannerDiscovered(callback: (scanners: ESCLScanner[]) => void): void;
+    async startDiscovery(): Promise<ESCLScanner[]>;
+    stopDiscovery(): void;
+    getScanners(): ESCLScanner[];
+    onScannerDiscovered(callback: (scanners: ESCLScanner[]) => void): void;
+    offScannerDiscovered(callback: (scanners: ESCLScanner[]) => void): void;
 }
 ```
 
@@ -451,11 +468,11 @@ Convenience function for simple scan workflow.
 
 ```typescript
 const images = await quickScan({
-  scanner: device,
-  dpi: 300,
-  mode: 'color',
-  source: 'Platen',
-  timeout: 30000
+    scanner: device,
+    dpi: 300,
+    mode: 'color',
+    source: 'Platen',
+    timeout: 30000,
 });
 ```
 
@@ -470,10 +487,10 @@ const images = await quickScan({
 
 ### Design Rationale
 
-- **Python for Discovery**: `zeroconf` library is more mature and stable than Node.js alternatives
-- **Subprocess Architecture**: Isolates network scanning from main application
-- **JSON-RPC Protocol**: Simple, reliable IPC between Node.js and Python processes
-- **Image Encoding**: Base64 PNG encoding for safe cross-process transmission
+-   **Python for Discovery**: `zeroconf` library is more mature and stable than Node.js alternatives
+-   **Subprocess Architecture**: Isolates network scanning from main application
+-   **JSON-RPC Protocol**: Simple, reliable IPC between Node.js and Python processes
+-   **Image Encoding**: Base64 PNG encoding for safe cross-process transmission
 
 ## Configuration
 
@@ -490,8 +507,8 @@ export ESCL_DEBUG=1
 ### Timeouts
 
 ```typescript
-const client = new ESCLClient(10000);  // 10 second HTTP timeout
-const scanners = await discoverScanners(5000);  // 5 second discovery window
+const client = new ESCLClient(10000); // 10 second HTTP timeout
+const scanners = await discoverScanners(5000); // 5 second discovery window
 ```
 
 ## Troubleshooting
@@ -499,21 +516,23 @@ const scanners = await discoverScanners(5000);  // 5 second discovery window
 ### Scanners Not Found
 
 1. **Check Python Dependencies**:
-   ```bash
-   pip install zeroconf pillow
-   ```
+
+    ```bash
+    pip install zeroconf pillow
+    ```
 
 2. **Verify Network**:
-   - Ensure scanner is on same network as computer
-   - Check scanner is powered on and connected
-   - Verify network is mDNS-enabled (not blocked by firewall)
+
+    - Ensure scanner is on same network as computer
+    - Check scanner is powered on and connected
+    - Verify network is mDNS-enabled (not blocked by firewall)
 
 3. **Enable Debug Output**:
-   ```typescript
-   import { ESCLDiscovery } from '@escl-protocol/scanner';
-   const discovery = new ESCLDiscovery();
-   // Check stderr output for Python errors
-   ```
+    ```typescript
+    import { ESCLDiscovery } from '@escl-protocol/scanner';
+    const discovery = new ESCLDiscovery();
+    // Check stderr output for Python errors
+    ```
 
 ### Connection Refused
 
@@ -524,9 +543,10 @@ const scanners = await discoverScanners(5000);  // 5 second discovery window
 ### Scan Timeouts
 
 1. Increase timeout value:
-   ```typescript
-   const client = new ESCLClient(30000);  // 30 seconds
-   ```
+
+    ```typescript
+    const client = new ESCLClient(30000); // 30 seconds
+    ```
 
 2. Check scanner network latency
 3. Reduce scan resolution for slower networks
@@ -534,9 +554,10 @@ const scanners = await discoverScanners(5000);  // 5 second discovery window
 ### Image Processing Issues
 
 1. Verify `pillow` library is installed:
-   ```bash
-   pip install --upgrade pillow
-   ```
+
+    ```bash
+    pip install --upgrade pillow
+    ```
 
 2. Check disk space for image temporary files
 3. Verify scanner outputs valid PNG/JPEG images
@@ -545,56 +566,35 @@ const scanners = await discoverScanners(5000);  // 5 second discovery window
 
 ```typescript
 try {
-  const scanners = await discoverScanners(5000);
+    const scanners = await discoverScanners(5000);
 
-  if (scanners.length === 0) {
-    throw new Error('No scanners found');
-  }
+    if (scanners.length === 0) {
+        throw new Error('No scanners found');
+    }
 
-  const capabilities = await client.getCapabilities(scanners[0]);
-  if (!capabilities) {
-    throw new Error('Failed to get capabilities');
-  }
+    const capabilities = await client.getCapabilities(scanners[0]);
+    if (!capabilities) {
+        throw new Error('Failed to get capabilities');
+    }
 
-  const jobId = await client.createScanJob(scanners[0], 300, 'RGB24', 'Platen');
-  if (!jobId) {
-    throw new Error('Failed to create scan job');
-  }
+    const jobId = await client.createScanJob(scanners[0], 300, 'RGB24', 'Platen');
+    if (!jobId) {
+        throw new Error('Failed to create scan job');
+    }
 } catch (error) {
-  console.error('eSCL operation failed:', error.message);
-  // Handle error appropriately
+    console.error('eSCL operation failed:', error.message);
+    // Handle error appropriately
 }
 ```
 
 ## Performance Considerations
 
-- **Discovery Time**: ~5 seconds for local network scan
-- **Scan Time**: Varies by document size, DPI, and network latency
-  - Single page A4 at 300 DPI: typically 5-10 seconds
-  - Large batch jobs: minutes depending on document count
-- **Memory Usage**: Python subprocess uses ~50-100MB when idle
-- **Network**: Requires local network access to scanners (no internet required)
-
-## Compatibility
-
-### Operating Systems
-- ✅ macOS 10.14+
-- ✅ Linux (Ubuntu 18.04+, CentOS 7+, etc.)
-- ✅ Windows 10+ (with Python 3.6+)
-
-### Node.js Versions
-- ✅ Node.js 14.x
-- ✅ Node.js 16.x
-- ✅ Node.js 18.x
-- ✅ Node.js 20.x
-
-### Scanner Models
-- ✅ Canon: iR-ADV C series, iR 2500/3000 series
-- ✅ HP: LaserJet Pro M series, MFP devices
-- ✅ Xerox: WorkCentre 5000+ series
-- ✅ Ricoh: MP C series
-- ✅ Epson: WorkForce Pro series
-- ✅ Brother: MFC series (eSCL enabled)
+-   **Discovery Time**: ~5 seconds for local network scan
+-   **Scan Time**: Varies by document size, DPI, and network latency
+    -   Single page A4 at 300 DPI: typically 5-10 seconds
+    -   Large batch jobs: minutes depending on document count
+-   **Memory Usage**: Python subprocess uses ~50-100MB when idle
+-   **Network**: Requires local network access to scanners (no internet required)
 
 ## Development
 
@@ -648,16 +648,18 @@ MIT
 ## Support
 
 For issues, questions, or feature requests:
-- GitHub Repository: [escl-protocol-scanner](https://github.com/byeong1/escl-protocol-scanner)
-- GitHub Issues: [Report Issues](https://github.com/byeong1/escl-protocol-scanner/issues)
-- npm Package: [@escl-protocol/scanner](https://www.npmjs.com/package/@escl-protocol/scanner)
-- Email: your-email@example.com
+
+-   GitHub Repository: [escl-protocol-scanner](https://github.com/byeong1/escl-protocol-scanner)
+-   GitHub Issues: [Report Issues](https://github.com/byeong1/escl-protocol-scanner/issues)
+-   npm Package: [@escl-protocol/scanner](https://www.npmjs.com/package/@escl-protocol/scanner)
+-   Email: your-email@example.com
 
 ## Changelog
 
 ### Version 1.0.0 (Initial Release)
-- Basic eSCL protocol support
-- Scanner discovery via mDNS
-- Single and batch scanning
-- Image rotation and encoding
-- Support for multiple manufacturers
+
+-   Basic eSCL protocol support
+-   Scanner discovery via mDNS
+-   Single and batch scanning
+-   Image rotation and encoding
+-   Support for multiple manufacturers
