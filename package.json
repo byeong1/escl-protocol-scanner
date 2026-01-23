@@ -1,6 +1,6 @@
 {
     "name": "@crowsgear/escl-protocol-scanner",
-    "version": "1.0.15",
+    "version": "1.0.16",
     "description": "eSCL/AirPrint Protocol Scanner Library - HTTP-based network scanner support with mDNS discovery",
     "license": "MIT",
     "author": "CrowsGear",
