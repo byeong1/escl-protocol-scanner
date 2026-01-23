@@ -10,6 +10,10 @@ on:
         description: 'Version to publish (e.g., 1.0.13)'
         required: false
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-binaries:
     strategy:
