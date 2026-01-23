@@ -31,6 +31,8 @@ export interface ESCLCapabilities {
   colorModes: ('BlackAndWhite1' | 'Grayscale8' | 'RGB24')[];
   /** Available scan sources */
   sources: ('Platen' | 'Adf' | 'Feeder')[];
+  /** Supported document formats (MIME types from scanner, e.g., 'image/jpeg', 'image/png', 'application/pdf') */
+  documentFormats: string[];
   /** Maximum scannable area width in mm */
   maxWidth?: number;
   /** Maximum scannable area height in mm */

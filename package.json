@@ -1,6 +1,6 @@
 {
     "name": "@crowsgear/escl-protocol-scanner",
-    "version": "1.0.8",
+    "version": "1.0.12",
     "description": "eSCL/AirPrint Protocol Scanner Library - HTTP-based network scanner support with mDNS discovery",
     "license": "MIT",
     "author": "CrowsGear",
@@ -32,6 +32,7 @@
     "files": [
         "dist",
         "python",
+        "bin",
         "scripts",
         "README.md",
         "LICENSE"
@@ -45,7 +46,7 @@
         "postinstall": "node scripts/check-python-deps.js",
         "publish:npm": "npm publish --registry https://registry.npmjs.org/ --access public",
         "publish:github": "npm publish --registry https://npm.pkg.github.com --access public",
-        "publish:all": "npm version patch && npm run publish:npm && npm run publish:github"
+        "publish:all": "npm version patch && yarn publish:npm && yarn publish:github"
     },
     "keywords": [
         "escl",

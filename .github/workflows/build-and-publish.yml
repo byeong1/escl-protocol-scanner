@@ -1,0 +1,103 @@
+name: Build and Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.13)'
+        required: false
+
+jobs:
+  build-binaries:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            binary_name: escl-scanner.exe
+          - os: macos-latest
+            platform: darwin
+            binary_name: escl-scanner
+          - os: ubuntu-latest
+            platform: linux
+            binary_name: escl-scanner
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build binary
+        working-directory: python
+        run: pyinstaller --clean --distpath ../bin/${{ matrix.platform }} escl-scanner.spec
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}
+          path: bin/${{ matrix.platform }}/${{ matrix.binary_name }}
+          retention-days: 1
+
+  publish:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download all binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: bin-artifacts
+
+      - name: Organize binaries
+        run: |
+          mkdir -p bin/win32 bin/darwin bin/linux
+          cp bin-artifacts/binary-win32/escl-scanner.exe bin/win32/
+          cp bin-artifacts/binary-darwin/escl-scanner bin/darwin/
+          cp bin-artifacts/binary-linux/escl-scanner bin/linux/
+          chmod +x bin/darwin/escl-scanner bin/linux/escl-scanner
+          ls -la bin/*/
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Build TypeScript
+        run: yarn build
+
+      - name: Publish to npm
+        run: npm publish --registry https://registry.npmjs.org/ --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Setup GitHub Packages registry
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Publish to GitHub Packages
+        run: npm publish --registry https://npm.pkg.github.com --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -44,16 +44,22 @@ export class ESCLClient {
    * @param dpi Resolution in DPI
    * @param colorMode Color mode (BlackAndWhite1, Grayscale8, RGB24)
    * @param source Scan source (Platen, Feeder)
+   * @param documentFormat Document format MIME type
+   * @param width Scan width in mm (optional)
+   * @param height Scan height in mm (optional)
    * @returns Scan job UUID
    */
   async createScanJob(
     scanner: ESCLScanner,
     dpi: number,
     colorMode: string,
-    source: string
+    source: string,
+    documentFormat: string,
+    width?: number,
+    height?: number
   ): Promise<string | null> {
     try {
-      const scanSettings = this.buildScanSettings(dpi, colorMode, source);
+      const scanSettings = this.buildScanSettings(dpi, colorMode, source, documentFormat, width, height);
       const jobResponse = await this.httpPost(
         `http://${scanner.host}:${scanner.port}/eSCL/ScanJobs`,
         scanSettings
@@ -66,9 +72,26 @@ export class ESCLClient {
       }
 
       return null;
-    } catch (error) {
+    } catch (error: any) {
+      const statusCode = error.code || (error.message && parseInt(error.message.match(/HTTP (\d+)/)?.[1]));
+
+      /* 409: 스캐너가 다른 작업을 처리 중 */
+      if (statusCode === 409) {
+        throw new Error('[SCANNER_BUSY] 스캐너가 다른 작업을 처리 중입니다. 잠시 후 다시 시도해주세요.');
+      }
+
+      /* 500: ADF 모드에서 문서 없음 */
+      if (statusCode === 500 && source === 'Feeder') {
+        throw new Error('[ADF_NO_DOCUMENT] 문서가 급지기(ADF)에 올려져 있지 않습니다.');
+      }
+
+      /* 503: 스캐너 서비스 불가 */
+      if (statusCode === 503) {
+        throw new Error('[SCANNER_UNAVAILABLE] 스캐너를 사용할 수 없습니다. 스캐너 상태를 확인해주세요.');
+      }
+
       console.error(`Failed to create scan job on ${scanner.name}:`, error);
-      return null;
+      throw error;
     }
   }
 
@@ -124,11 +147,20 @@ export class ESCLClient {
 
   /**
    * Build eSCL scan settings XML
+   * @param dpi Resolution in DPI
+   * @param colorMode Color mode
+   * @param source Scan source
+   * @param documentFormat Document format MIME type
+   * @param width Scan width in mm (optional)
+   * @param height Scan height in mm (optional)
    */
-  private buildScanSettings(dpi: number, colorMode: string, source: string): string {
-    // Match the Python implementation which uses proper namespaces
+  private buildScanSettings(dpi: number, colorMode: string, source: string, documentFormat: string, width?: number, height?: number): string {
     const ESCL_NS = 'http://schemas.hp.com/imaging/escl/2011/05/03';
     const PWG_NS = 'http://www.pwg.org/schemas/2010/12/sm';
+
+    /* mm to 1/300 inch 변환 */
+    const widthInUnits = Math.round((width || 210) / 25.4 * 300);
+    const heightInUnits = Math.round((height || 297) / 25.4 * 300);
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <scan:ScanSettings xmlns:scan="${ESCL_NS}" xmlns:pwg="${PWG_NS}">
@@ -139,8 +171,8 @@ export class ESCLClient {
       <pwg:ContentRegionUnits>escl:ThreeHundredthsOfInches</pwg:ContentRegionUnits>
       <pwg:XOffset>0</pwg:XOffset>
       <pwg:YOffset>0</pwg:YOffset>
-      <pwg:Width>3508</pwg:Width>
-      <pwg:Height>4961</pwg:Height>
+      <pwg:Width>${widthInUnits}</pwg:Width>
+      <pwg:Height>${heightInUnits}</pwg:Height>
     </pwg:ScanRegion>
   </pwg:ScanRegions>
   <scan:Justification>
@@ -151,7 +183,7 @@ export class ESCLClient {
   <scan:ColorMode>${colorMode}</scan:ColorMode>
   <scan:XResolution>${dpi}</scan:XResolution>
   <scan:YResolution>${dpi}</scan:YResolution>
-  <pwg:DocumentFormat>image/jpeg</pwg:DocumentFormat>
+  <pwg:DocumentFormat>${documentFormat}</pwg:DocumentFormat>
 </scan:ScanSettings>`;
   }
 
@@ -164,6 +196,7 @@ export class ESCLClient {
     const resolutions: number[] = [];
     const colorModes: ('BlackAndWhite1' | 'Grayscale8' | 'RGB24')[] = [];
     const sources: ('Platen' | 'Adf' | 'Feeder')[] = [];
+    const documentFormats: string[] = [];
 
     // Debug: Print raw XML for inspection (only if debug enabled)
     if (debug) {
@@ -217,16 +250,60 @@ export class ESCLClient {
       }
     }
 
+    // Extract document formats (MIME types)
+    // Look for <pwg:DocumentFormat> and <scan:DocumentFormatExt> tags
+    const formatMatches = xml.matchAll(/<[a-z]*:?DocumentFormat(?:Ext)?>([^<]+)<\/[a-z]*:?DocumentFormat(?:Ext)?>/g);
+    for (const match of formatMatches) {
+      const format = match[1].trim();
+      if (format && !documentFormats.includes(format)) {
+        documentFormats.push(format);
+      }
+    }
+
+    // If no formats found, default to jpeg (most common)
+    if (documentFormats.length === 0) {
+      documentFormats.push('image/jpeg');
+    }
+
+    // Extract max width and height (in 1/300 inch units, convert to mm)
+    let maxWidth: number | undefined;
+    let maxHeight: number | undefined;
+
+    const maxWidthMatch = xml.match(/<[a-z]*:?MaxWidth>(\d+)<\/[a-z]*:?MaxWidth>/);
+    const maxHeightMatch = xml.match(/<[a-z]*:?MaxHeight>(\d+)<\/[a-z]*:?MaxHeight>/);
+
+    if (maxWidthMatch) {
+      maxWidth = Math.round(parseInt(maxWidthMatch[1], 10) / 300 * 25.4);
+    }
+    if (maxHeightMatch) {
+      maxHeight = Math.round(parseInt(maxHeightMatch[1], 10) / 300 * 25.4);
+    }
+
     // Remove duplicates from resolutions
     const uniqueResolutions = Array.from(new Set(resolutions)).sort((a, b) => a - b);
     const uniqueColorModes = Array.from(new Set(colorModes));
     const uniqueSources = Array.from(new Set(sources));
+    const uniqueDocumentFormats = Array.from(new Set(documentFormats));
 
     if (debug) {
-      console.log('[eSCL] Parsed capabilities:', { resolutions: uniqueResolutions, colorModes: uniqueColorModes, sources: uniqueSources });
+      console.log('[eSCL] Parsed capabilities:', {
+        resolutions: uniqueResolutions,
+        colorModes: uniqueColorModes,
+        sources: uniqueSources,
+        documentFormats: uniqueDocumentFormats,
+        maxWidth,
+        maxHeight
+      });
     }
 
-    return { resolutions: uniqueResolutions, colorModes: uniqueColorModes, sources: uniqueSources };
+    return {
+      resolutions: uniqueResolutions,
+      colorModes: uniqueColorModes,
+      sources: uniqueSources,
+      documentFormats: uniqueDocumentFormats,
+      maxWidth,
+      maxHeight
+    };
   }
 
   /**

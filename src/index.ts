@@ -94,10 +94,13 @@ export async function quickScan(params: {
   dpi: number;
   mode: 'bw' | 'gray' | 'color';
   source: 'Platen' | 'Feeder';
+  documentFormat: string;
   timeout?: number;
   savePath?: string;
+  width?: number;
+  height?: number;
 }): Promise<string[] | null> {
-  let { scanner, dpi, mode, source, timeout, savePath } = params;
+  let { scanner, dpi, mode, source, documentFormat, timeout, savePath, width, height } = params;
   const client = new ESCLClient(timeout);
 
   // Default save path to current working directory if not provided
@@ -119,9 +122,9 @@ export async function quickScan(params: {
     }
 
     // 1. Create scan job
-    const jobId = await client.createScanJob(scanner, dpi, colorMode, source);
+    const jobId = await client.createScanJob(scanner, dpi, colorMode, source, documentFormat, width, height);
     if (!jobId) {
-      throw new Error('Failed to create scan job');
+      throw new Error('[SCAN_JOB_FAILED] 스캔 작업을 생성할 수 없습니다. 스캐너 상태를 확인해주세요.');
     }
 
     const jobUrl = `http://${scanner.host}:${scanner.port}/eSCL/ScanJobs/${jobId}`;
@@ -138,7 +141,7 @@ export async function quickScan(params: {
 
     while (true) {
       console.log(`[eSCL] Attempting to download page ${pageNum}...`);
-      const imageBuffer = await downloadNextDocument(jobUrl);
+      const imageBuffer = await downloadNextDocument(jobUrl, 30, 1000, isAdf);
 
       if (!imageBuffer) {
         // 404 or error
@@ -156,7 +159,7 @@ export async function quickScan(params: {
       console.log(`[eSCL] Page ${pageNum} downloaded: ${imageBuffer.length} bytes`);
 
       // Save image to file
-      const filePath = await saveImageToFile(savePath, imageBuffer, pageNum);
+      const filePath = await saveImageToFile(savePath, imageBuffer, pageNum, documentFormat);
       filePaths.push(filePath);
 
       // Platen (flatbed) only has 1 page
@@ -173,30 +176,34 @@ export async function quickScan(params: {
     return filePaths.length > 0 ? filePaths : null;
   } catch (error) {
     console.error('Quick scan failed:', error);
-    return null;
+    throw error;
   }
 }
 
 /**
  * Save image to file system
+ * @param folderPath Target folder path
+ * @param imageBuffer Image data buffer
+ * @param pageNum Page number
+ * @param documentFormat MIME type (e.g., 'image/jpeg', 'image/png', 'application/pdf')
  */
-async function saveImageToFile(folderPath: string, imageBuffer: Buffer, pageNum: number): Promise<string> {
+async function saveImageToFile(folderPath: string, imageBuffer: Buffer, pageNum: number, documentFormat: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const fs = require('fs');
     const path = require('path');
 
     try {
-      // Create folder if it doesn't exist
       if (!fs.existsSync(folderPath)) {
         fs.mkdirSync(folderPath, { recursive: true });
       }
 
-      // Generate filename with timestamp
+      let ext = documentFormat.split('/').pop()!;
+      if (ext === 'jpeg') ext = 'jpg';
+
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const fileName = `scan_${timestamp}_page${pageNum}.jpg`;
+      const fileName = `scan_${timestamp}_page${pageNum}.${ext}`;
       const filePath = path.join(folderPath, fileName);
 
-      // Write file synchronously
       fs.writeFileSync(filePath, imageBuffer);
       console.log(`[eSCL] Image saved: ${filePath}`);
 
@@ -208,20 +215,41 @@ async function saveImageToFile(folderPath: string, imageBuffer: Buffer, pageNum:
 }
 
 /**
- * Download next document from scan job
+ * Download next document from scan job with retry for 409 (busy)
  */
-async function downloadNextDocument(jobUrl: string): Promise<Buffer | null> {
-  try {
-    const nextDocUrl = `${jobUrl}/NextDocument`;
-    return await httpGetBinary(nextDocUrl);
-  } catch (error: any) {
-    // 404 is expected when scan is complete
-    if (error.code === 404 || (error.message && error.message.includes('404'))) {
+async function downloadNextDocument(jobUrl: string, maxRetries: number = 30, retryDelay: number = 1000, isAdf: boolean = false): Promise<Buffer | null> {
+  const nextDocUrl = `${jobUrl}/NextDocument`;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await httpGetBinary(nextDocUrl);
+    } catch (error: any) {
+      const statusCode = error.code || (error.message && parseInt(error.message.match(/HTTP (\d+)/)?.[1]));
+
+      /* 404: 스캔 완료 (더 이상 문서 없음) */
+      if (statusCode === 404) {
+        return null;
+      }
+
+      /* 409: 스캐너가 아직 작업 중 - 재시도 */
+      if (statusCode === 409) {
+        console.log(`[eSCL] Scanner busy (409), waiting... (attempt ${attempt}/${maxRetries})`);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        continue;
+      }
+
+      /* 500: ADF 모드에서 문서 없음 */
+      if (statusCode === 500 && isAdf) {
+        throw new Error('[ADF_NO_DOCUMENT] 문서가 급지기(ADF)에 올려져 있지 않습니다.');
+      }
+
+      console.error('[eSCL] Failed to download next document:', error);
       return null;
     }
-    console.error('[eSCL] Failed to download next document:', error);
-    return null;
   }
+
+  /* 최대 재시도 횟수 초과 */
+  throw new Error('[SCANNER_BUSY] 스캐너가 다른 작업을 처리 중입니다. 잠시 후 다시 시도해주세요.');
 }
 
 /**

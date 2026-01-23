@@ -18,6 +18,18 @@ const REQUIRED_PACKAGES = ['zeroconf', 'pillow'];
 const PACKAGE_JSON_PATH = path.join(__dirname, '..', 'package.json');
 const PROJECT_ROOT = path.dirname(path.dirname(PACKAGE_JSON_PATH));
 
+/**
+ * 플랫폼별 바이너리 존재 여부 확인
+ */
+function checkBinaryExists() {
+  const platform = process.platform; // 'win32', 'darwin', 'linux'
+  const binDir = path.join(__dirname, '..', 'bin', platform);
+  const binaryName = platform === 'win32' ? 'escl-scanner.exe' : 'escl-scanner';
+  const binaryPath = path.join(binDir, binaryName);
+
+  return fs.existsSync(binaryPath);
+}
+
 // 색상 코드
 const colors = {
   reset: '\x1b[0m',
@@ -146,6 +158,15 @@ async function installPackages(pythonPath, packages) {
  */
 async function main() {
   log.header('eSCL Protocol Scanner - Python 의존성 확인');
+
+  // 바이너리 존재 여부 확인 - 있으면 Python 체크 스킵
+  if (checkBinaryExists()) {
+    log.success('Pre-built 바이너리가 존재합니다. Python 의존성 체크를 건너뜁니다.');
+    console.log();
+    process.exit(0);
+  }
+
+  log.info('Pre-built 바이너리가 없습니다. Python 의존성을 확인합니다...');
 
   // Python 경로 결정
   const pythonPath = findPythonPath();

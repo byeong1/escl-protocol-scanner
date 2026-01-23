@@ -9,6 +9,13 @@ dist/
 *.js.map
 *.d.ts.map
 
+# PyInstaller build
+bin/
+python/build/
+python/dist/
+python/*.spec.bak
+__pycache__/
+
 # Environment
 .env
 .env.local
@@ -43,3 +50,6 @@ yarn-error.log*
 temp/
 
 .npmrc
+
+.venv
+__ptcache__

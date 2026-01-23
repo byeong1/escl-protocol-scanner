@@ -1,6 +1,7 @@
 /**
- * eSCL Scanner Discovery via Python Subprocess
+ * eSCL Scanner Discovery via Python Subprocess or Binary
  * Uses Python's zeroconf library for mDNS discovery
+ * Prefers pre-built binary if available, falls back to Python script
  */
 
 import { spawn, ChildProcess } from 'child_process';
@@ -19,7 +20,7 @@ export interface ESCLDiscoveryOptions {
 
 /**
  * eSCL Scanner Discovery Service
- * Spawns Python subprocess to handle mDNS discovery using zeroconf
+ * Spawns Python subprocess or binary to handle mDNS discovery using zeroconf
  */
 export class ESCLDiscovery {
   private pythonProcess: ChildProcess | null = null;
@@ -28,6 +29,7 @@ export class ESCLDiscovery {
   private timeout: number = 5000;
   private processReady: boolean = false;
   private pythonPath: string = 'python3';
+  private binaryPath: string | null = null;
 
   constructor(timeout?: number, options?: ESCLDiscoveryOptions) {
     if (timeout) {
@@ -36,13 +38,37 @@ export class ESCLDiscovery {
     if (options?.pythonPath) {
       this.pythonPath = options.pythonPath;
     }
+    // Check for pre-built binary
+    this.binaryPath = this.getBinaryPath();
+  }
+
+  /**
+   * Get path to pre-built binary if available
+   * @returns Binary path or null if not found
+   */
+  private getBinaryPath(): string | null {
+    const platform = process.platform; // 'win32', 'darwin', 'linux'
+    const binDir = path.join(__dirname, '..', 'bin', platform);
+    const binaryName = platform === 'win32' ? 'escl-scanner.exe' : 'escl-scanner';
+    const binaryPath = path.join(binDir, binaryName);
+
+    if (fs.existsSync(binaryPath)) {
+      return binaryPath;
+    }
+    return null;
   }
 
   /**
    * Validate Python path exists and is executable
-   * @throws Error if Python path is invalid
+   * Skipped if pre-built binary is available
+   * @throws Error if Python path is invalid and no binary available
    */
   private validatePythonPath(): void {
+    // Skip validation if binary is available
+    if (this.binaryPath) {
+      return;
+    }
+
     // Check if it's an absolute path
     if (path.isAbsolute(this.pythonPath)) {
       if (!fs.existsSync(this.pythonPath)) {
@@ -151,7 +177,7 @@ export class ESCLDiscovery {
   }
 
   /**
-   * Start Python subprocess for eSCL operations
+   * Start Python subprocess or binary for eSCL operations
    */
   private startPythonService(): void {
     if (this.pythonProcess) {
@@ -159,13 +185,22 @@ export class ESCLDiscovery {
     }
 
     try {
-      // Get path to Python script relative to this module
-      const pythonScriptPath = path.join(__dirname, '..', 'python', 'escl_main.py');
-
-      this.pythonProcess = spawn(this.pythonPath, [pythonScriptPath], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        windowsHide: true
-      });
+      if (this.binaryPath) {
+        // Use pre-built binary (production/package environment)
+        console.log(`[eSCL] Using binary: ${this.binaryPath}`);
+        this.pythonProcess = spawn(this.binaryPath, [], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true
+        });
+      } else {
+        // Fall back to Python script (development environment)
+        const pythonScriptPath = path.join(__dirname, '..', 'python', 'escl_main.py');
+        console.log(`[eSCL] Using Python script: ${pythonScriptPath}`);
+        this.pythonProcess = spawn(this.pythonPath, [pythonScriptPath], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true
+        });
+      }
 
       // Handle stdout - parse JSON responses
       if (this.pythonProcess.stdout) {

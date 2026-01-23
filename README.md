@@ -1,665 +1,191 @@
-# @escl-protocol/scanner
+# @crowsgear/escl-protocol-scanner
 
-A comprehensive TypeScript/Node.js library for discovering and communicating with network scanners using the **eSCL (Enhanced Scanner Communication Language)** protocol, which is based on **AirPrint** standards.
+Network scanner library based on eSCL/AirPrint protocol.
 
-## Features
-
--   🔍 **Automatic Scanner Discovery**: Uses mDNS/Bonjour to discover eSCL-compatible scanners on the local network
--   📡 **HTTP-based Communication**: eSCL protocol built on HTTP for reliable device communication
--   🎨 **Multiple Color Modes**: Support for Black & White, Grayscale, and Full Color scanning
--   📊 **Flexible Resolution**: Supports various DPI settings (150, 200, 300, 600 DPI, etc.)
--   📄 **Multi-source Scanning**: Platen (flatbed) and ADF (Automatic Document Feeder) support
--   📸 **Image Processing**: Automatic rotation correction and PNG encoding
--   🔧 **Python Backend**: Uses Python subprocess for reliable mDNS discovery via zeroconf
--   ✨ **Production Ready**: Mature implementation from scanner-net project
-
-## Supported Devices
-
-Compatible with network scanners from major manufacturers:
-
--   **Canon**: iR-series MFP devices
--   **HP**: LaserJet MFP devices
--   **Xerox**: WorkCentre series
--   **Ricoh**: MP series
--   **Epson**: WorkForce Pro series
--   **And other AirPrint-compatible MFP devices**
+> **Note**: This library only supports network-connected scanners (WiFi or LAN). USB scanners are not supported - use WIA (Windows) or system scan dialog instead.
 
 ## Installation
 
-### Prerequisites
-
--   Node.js ≥ 14.0.0
--   Python 3.6+
--   Python packages: `zeroconf`, `pillow`
-
-### Step 1: Install Package
-
 ```bash
-npm install @escl-protocol/scanner
+npm install @crowsgear/escl-protocol-scanner
 # or
-yarn add @escl-protocol/scanner
+yarn add @crowsgear/escl-protocol-scanner
 ```
 
-The postinstall script will:
+### Python Dependencies
 
-1. Check for required Python packages (`zeroconf`, `pillow`)
-2. **Interactively ask** if you want to install missing packages
-3. Install to the Python environment specified by `PYTHON_PATH` (or system python3)
-
-### Step 2: Setup Python Environment
-
-#### Option A: Using Virtual Environment (Recommended)
+Requires Python 3.6+ and the following packages:
 
 ```bash
-# 1. Create virtual environment
-python3 -m venv venv
-
-# 2. Get absolute path to Python executable
-# Copy the full path (e.g., /Users/username/project/venv/bin/python3)
-python3 -c "import sys; print(sys.executable)"
-
-# 3. Install Python packages
-source venv/bin/activate
 pip install zeroconf pillow
-
-# 4. Set PYTHON_PATH using ABSOLUTE path (important!)
-# Use the full path from step 2, e.g.:
-export PYTHON_PATH=/Users/username/project/venv/bin/python3
-```
-
-⚠️ **Important**: Always use **absolute path** for `PYTHON_PATH`, not relative paths like `./venv/bin/python3`
-
-#### Option B: Using System Python
-
-```bash
-# Just ensure Python packages are installed
-pip3 install zeroconf pillow
-```
-
-## Runtime Configuration
-
-### Using Virtual Environment
-
-Set the `PYTHON_PATH` environment variable when running your application:
-
-```bash
-# Option 1: Export before running
-export PYTHON_PATH=./venv/bin/python3
-npm start
-
-# Option 2: One-liner
-PYTHON_PATH=./venv/bin/python3 npm start
-
-# Option 3: In package.json scripts
-{
-  "scripts": {
-    "start": "PYTHON_PATH=./venv/bin/python3 electron ."
-  }
-}
-```
-
-### Environment-Specific Setup
-
-Create separate `.env` files for different environments:
-
-```bash
-# .env.dev
-PYTHON_PATH=./venv-dev/bin/python3
-
-# .env.staging
-PYTHON_PATH=./venv-staging/bin/python3
-
-# .env.production
-PYTHON_PATH=/usr/local/bin/python3
-```
-
-Then activate the appropriate environment:
-
-```bash
-source .env.dev
-npm start
 ```
 
 ## Quick Start
 
-### Basic Usage
+### 1. Discover Scanners
 
 ```typescript
-import { discoverScanners, ESCLClient } from '@escl-protocol/scanner';
+import { discoverScanners } from "@crowsgear/escl-protocol-scanner";
 
-async function example() {
-    // 1. Discover available scanners (5 second discovery window)
-    const scanners = await discoverScanners(5000);
-    console.log(`Found ${scanners.length} scanners`);
+// Basic usage (uses system Python)
+const result = await discoverScanners(10000);
 
-    if (scanners.length === 0) {
-        console.log('No scanners found on network');
-        return;
-    }
-
-    // 2. Get scanner info
-    const scanner = scanners[0];
-    console.log(`Scanner: ${scanner.name}`);
-    console.log(`Host: ${scanner.host}:${scanner.port}`);
-}
-
-example();
-```
-
-### Discover Scanners
-
-```typescript
-import { discoverScanners, ESCLScanner } from '@escl-protocol/scanner';
-
-// Quick discovery
-const scanners = await discoverScanners(5000);
-
-scanners.forEach((scanner) => {
-    console.log(`${scanner.name} at ${scanner.host}:${scanner.port}`);
-    if (scanner.manufacturer) {
-        console.log(`  Manufacturer: ${scanner.manufacturer}`);
-    }
-    if (scanner.model) {
-        console.log(`  Model: ${scanner.model}`);
-    }
-});
-```
-
-### Get Scanner Capabilities
-
-```typescript
-import { discoverScanners, ESCLClient } from '@escl-protocol/scanner';
-
-const scanners = await discoverScanners(5000);
-const client = new ESCLClient();
-
-const capabilities = await client.getCapabilities(scanners[0]);
-if (capabilities) {
-    console.log('Supported Resolutions:', capabilities.resolutions);
-    console.log('Color Modes:', capabilities.colorModes);
-    console.log('Scan Sources:', capabilities.sources);
-}
-```
-
-### Perform a Scan
-
-```typescript
-import { discoverScanners, ESCLClient } from '@escl-protocol/scanner';
-
-const scanners = await discoverScanners(5000);
-const client = new ESCLClient();
-
-// Create scan job
-const jobId = await client.createScanJob(
-    scanners[0],
-    300, // DPI (300 DPI)
-    'RGB24', // Color mode (Full Color)
-    'Platen' // Source (Flatbed)
-);
-
-if (!jobId) {
-    console.error('Failed to create scan job');
-    process.exit(1);
-}
-
-// Poll for completion
-let completed = false;
-let attempts = 0;
-
-while (!completed && attempts < 30) {
-    const status = await client.getScanJobStatus(scanners[0], jobId);
-
-    if (status.status === 'Completed') {
-        // Download images
-        for (const imageUrl of status.images) {
-            const imageBuffer = await client.downloadImage(scanners[0], imageUrl);
-            if (imageBuffer) {
-                console.log('Downloaded image:', imageBuffer.length, 'bytes');
-            }
-        }
-        completed = true;
-    } else if (status.status === 'Aborted') {
-        console.error('Scan was aborted');
-        process.exit(1);
-    } else {
-        console.log(`Scan progress: ${status.status}`);
-        // Wait before next poll
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        attempts++;
-    }
-}
-
-if (!completed) {
-    console.error('Scan job timeout');
-    process.exit(1);
-}
-```
-
-### Quick Scan Helper
-
-For simple one-off scans:
-
-```typescript
-import { discoverScanners, quickScan } from '@escl-protocol/scanner';
-
-const scanners = await discoverScanners(5000);
-
-const images = await quickScan({
-    scanner: scanners[0],
-    dpi: 300,
-    mode: 'color', // 'bw' | 'gray' | 'color'
-    source: 'Platen', // 'Platen' | 'Feeder'
-    timeout: 30000,
+// Specify Python path directly (recommended)
+const result = await discoverScanners(10000, {
+    pythonPath: "/path/to/.venv/bin/python3",
 });
 
-if (images) {
-    console.log(`Scanned ${images.length} images`);
-    // images are base64-encoded PNG data
+if (result.success && result.data.length > 0) {
+    console.log("Found scanners:", result.data);
 }
 ```
 
-## Choosing Your Scanning Approach
-
-The library provides two different ways to perform scans, each with different use cases:
-
-### Low-Level API: `client.createScanJob()`
-
-**Use this when you need:**
-
--   Fine-grained control over the scanning process
--   Custom polling intervals or timeout logic
--   To handle batch scanning with specific error recovery
--   Advanced features like job cancellation
-
-**How it works:**
-
-1. Create scan job with parameters → returns Job ID
-2. Poll `getScanJobStatus()` to check completion
-3. Download each image with `downloadImage()`
-4. Manually manage job lifecycle
-
-**Example:**
+### 2. Get Scanner Capabilities
 
 ```typescript
-// Step 1: Create job
-const jobId = await client.createScanJob(scanner, 300, 'RGB24', 'Platen');
+import { ESCLClient } from "@crowsgear/escl-protocol-scanner";
 
-// Step 2: Poll for completion with custom logic
-while (!completed) {
-    const status = await client.getScanJobStatus(scanner, jobId);
+const client = new ESCLClient(10000);
+const capabilities = await client.getCapabilities(scanner);
 
-    if (status.status === 'Completed') {
-        // Step 3: Download images
-        for (const imageUrl of status.images) {
-            const buffer = await client.downloadImage(scanner, imageUrl);
-            // Custom processing...
-        }
-        completed = true;
-    }
-
-    await new Promise((r) => setTimeout(r, 1000)); // Custom delay
-}
+// capabilities structure:
+// {
+//   resolutions: [100, 200, 300, 600],      // Supported DPI
+//   colorModes: ['BlackAndWhite1', 'Grayscale8', 'RGB24'],
+//   sources: ['Platen', 'Adf'],              // Platen=flatbed, Adf=feeder
+//   maxWidth: 297,                           // Max scan width (mm)
+//   maxHeight: 432                           // Max scan height (mm)
+// }
 ```
 
-**Pros:**
-
--   Maximum flexibility and control
--   Custom error handling strategies
--   Can implement custom polling logic
--   Direct access to job status
-
-**Cons:**
-
--   More code to write and maintain
--   More opportunities for bugs
--   Requires manual resource cleanup
-
-### High-Level API: `quickScan()`
-
-**Use this when you need:**
-
--   Simple one-shot scanning (most common case)
--   Fast implementation without boilerplate
--   Automatic error handling and cleanup
--   Sensible defaults for typical scanning scenarios
-
-**How it works:**
-
-1. Creates scan job automatically
-2. Waits and polls for completion (~5 second intervals)
-3. Downloads all images
-4. Saves to disk automatically
-5. Cleans up job automatically
-
-**Example:**
+### 3. Perform Scan
 
 ```typescript
+import { quickScan } from "@crowsgear/escl-protocol-scanner";
+
 const filePaths = await quickScan({
-    scanner: scanners[0],
+    scanner: scanner,
     dpi: 300,
-    mode: 'color', // 'bw' | 'gray' | 'color'
-    source: 'Platen', // 'Platen' | 'Feeder'
-    savePath: './scans', // optional, defaults to cwd()
+    mode: "color", // 'bw' | 'gray' | 'color'
+    source: "Platen", // 'Platen' | 'Feeder'
+    savePath: "/save/path",
+    width: 210, // Scan width in mm (default: 210 = A4)
+    height: 297, // Scan height in mm (default: 297 = A4)
+    timeout: 30000,
 });
 
 if (filePaths) {
-    console.log(`Scanned ${filePaths.length} images`);
-    filePaths.forEach((path) => console.log(`  - ${path}`));
+    console.log("Saved files:", filePaths);
 }
 ```
 
-**Pros:**
+## Paper Size Reference
 
--   Minimal code required
--   Automatic cleanup on success/failure
--   Returns file paths ready for use
--   Built-in error handling
--   Best for simple scanning tasks
+| Paper  | Width (mm) | Height (mm) |
+| ------ | ---------- | ----------- |
+| A4     | 210        | 297         |
+| A3     | 297        | 420         |
+| Letter | 216        | 279         |
+| Legal  | 216        | 356         |
 
-**Cons:**
-
--   Less control over polling
--   Fixed timeout/retry logic
--   Cannot implement custom scanning workflows
-
-### Comparison Table
-
-| Feature            | `createScanJob()`          | `quickScan()`            |
-| ------------------ | -------------------------- | ------------------------ |
-| **Typical Use**    | Advanced, custom workflows | Simple one-shot scans    |
-| **Code Required**  | ~30+ lines                 | ~10 lines                |
-| **Control Level**  | Full                       | Limited                  |
-| **Error Handling** | Manual                     | Automatic                |
-| **Cleanup**        | Manual                     | Automatic                |
-| **Polling Logic**  | Custom                     | Built-in (~5s intervals) |
-| **Return Type**    | Job ID (string)            | File paths (string[])    |
-| **Learning Curve** | Moderate                   | Easy                     |
-| **Best For**       | Integrations, batch jobs   | Desktop apps, CLI tools  |
-
-### Recommendation
-
-**Choose `quickScan()` unless you have specific reasons not to:**
-
--   It's the recommended approach for most use cases
--   Handles all the complexity automatically
--   Reduces bugs and improves maintainability
--   Perfect for Electron, CLI, and batch applications
-
-**Choose `createScanJob()` only if:**
-
--   You need custom polling behavior
--   Implementing a queue system
--   Building advanced scanning workflows
--   Integrating with custom error handling
-
-## API Reference
-
-### Types
-
-#### `ESCLScanner`
+## Cross-Platform Python Path
 
 ```typescript
-interface ESCLScanner {
-    name: string; // Scanner display name
-    host: string; // IP address
-    port: number; // HTTP port (usually 80)
-    serviceName?: string; // Full mDNS service name
-    model?: string; // Device model (if available)
-    manufacturer?: string; // Device manufacturer (if available)
-}
+import path from "path";
+
+const projectRoot = process.cwd();
+const pythonPath =
+    process.platform === "win32"
+        ? path.join(projectRoot, ".venv", "python.exe")
+        : path.join(projectRoot, ".venv", "bin", "python3");
+
+const result = await discoverScanners(10000, { pythonPath });
 ```
 
-#### `ESCLCapabilities`
+## API
+
+### discoverScanners(timeout, options?)
+
+Discovers eSCL scanners on the network.
 
 ```typescript
-interface ESCLCapabilities {
-    resolutions: number[]; // Available DPI values
-    colorModes: ('BlackAndWhite1' | 'Grayscale8' | 'RGB24')[]; // Available color modes
-    sources: ('Platen' | 'Adf' | 'Feeder')[]; // Available scan sources
-}
+const result = await discoverScanners(10000, { pythonPath: "/path/to/python3" });
+// result: { success: boolean, data: ESCLScanner[], error?: string }
 ```
 
-### Classes
-
-#### `ESCLClient`
-
-Main client for communicating with eSCL scanners.
+### ESCLClient
 
 ```typescript
-class ESCLClient {
-    constructor(timeout?: number);
+const client = new ESCLClient(timeout?: number);
 
-    async getCapabilities(scanner: ESCLScanner): Promise<ESCLCapabilities | null>;
-    async createScanJob(scanner: ESCLScanner, dpi: number, colorMode: string, source: string): Promise<string | null>;
-    async getScanJobStatus(scanner: ESCLScanner, jobId: string): Promise<{ status: string; images: string[] }>;
-    async downloadImage(scanner: ESCLScanner, imageUrl: string): Promise<Buffer | null>;
-}
+// Get scanner capabilities
+const caps = await client.getCapabilities(scanner, debug?: boolean);
+
+// Create scan job
+const jobId = await client.createScanJob(
+  scanner,
+  dpi: number,
+  colorMode: string,      // 'BlackAndWhite1' | 'Grayscale8' | 'RGB24'
+  source: string,         // 'Platen' | 'Feeder'
+  width?: number,         // mm (default: 210)
+  height?: number         // mm (default: 297)
+);
+
+// Check scan status
+const status = await client.getScanJobStatus(scanner, jobId);
+
+// Download image
+const buffer = await client.downloadImage(scanner, imageUrl);
 ```
 
-#### `ESCLDiscovery`
+### quickScan(params)
 
-Scanner discovery service using Python subprocess with zeroconf.
-
-```typescript
-class ESCLDiscovery {
-    constructor(timeout?: number);
-
-    async startDiscovery(): Promise<ESCLScanner[]>;
-    stopDiscovery(): void;
-    getScanners(): ESCLScanner[];
-    onScannerDiscovered(callback: (scanners: ESCLScanner[]) => void): void;
-    offScannerDiscovered(callback: (scanners: ESCLScanner[]) => void): void;
-}
-```
-
-### Functions
-
-#### `discoverScanners(timeout: number): Promise<ESCLScanner[]>`
-
-Convenience function for quick scanner discovery.
+Convenience function - handles scan job creation to image saving in one call.
 
 ```typescript
-const scanners = await discoverScanners(5000); // 5 second discovery
-```
-
-#### `quickScan(params): Promise<string[] | null>`
-
-Convenience function for simple scan workflow.
-
-```typescript
-const images = await quickScan({
-    scanner: device,
-    dpi: 300,
-    mode: 'color',
-    source: 'Platen',
-    timeout: 30000,
+const filePaths = await quickScan({
+  scanner: ESCLScanner,
+  dpi: number,
+  mode: 'bw' | 'gray' | 'color',
+  source: 'Platen' | 'Feeder',
+  savePath?: string,      // Save path (default: cwd)
+  width?: number,         // mm (default: 210)
+  height?: number,        // mm (default: 297)
+  timeout?: number
 });
 ```
 
-## Architecture
-
-### How It Works
-
-1. **Discovery**: JavaScript code spawns a Python subprocess (`escl_main.py`)
-2. **Python Subprocess**: Uses `zeroconf` library to discover eSCL scanners on the network via mDNS
-3. **Communication**: JSON-RPC over stdin/stdout between Node.js and Python
-4. **Image Processing**: Python handles image rotation and PNG encoding
-
-### Design Rationale
-
--   **Python for Discovery**: `zeroconf` library is more mature and stable than Node.js alternatives
--   **Subprocess Architecture**: Isolates network scanning from main application
--   **JSON-RPC Protocol**: Simple, reliable IPC between Node.js and Python processes
--   **Image Encoding**: Base64 PNG encoding for safe cross-process transmission
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# Python path (if non-standard)
-export PYTHON_PATH=python3
-
-# Logging (if implemented)
-export ESCL_DEBUG=1
-```
-
-### Timeouts
+## Types
 
 ```typescript
-const client = new ESCLClient(10000); // 10 second HTTP timeout
-const scanners = await discoverScanners(5000); // 5 second discovery window
-```
+interface ESCLScanner {
+    name: string;
+    host: string;
+    port: number;
+    model?: string;
+    manufacturer?: string;
+}
 
-## Troubleshooting
-
-### Scanners Not Found
-
-1. **Check Python Dependencies**:
-
-    ```bash
-    pip install zeroconf pillow
-    ```
-
-2. **Verify Network**:
-
-    - Ensure scanner is on same network as computer
-    - Check scanner is powered on and connected
-    - Verify network is mDNS-enabled (not blocked by firewall)
-
-3. **Enable Debug Output**:
-    ```typescript
-    import { ESCLDiscovery } from '@escl-protocol/scanner';
-    const discovery = new ESCLDiscovery();
-    // Check stderr output for Python errors
-    ```
-
-### Connection Refused
-
-1. Verify scanner IP and port (usually port 80)
-2. Ensure firewall allows HTTP access to scanner
-3. Check scanner supports eSCL protocol (AirPrint-compatible)
-
-### Scan Timeouts
-
-1. Increase timeout value:
-
-    ```typescript
-    const client = new ESCLClient(30000); // 30 seconds
-    ```
-
-2. Check scanner network latency
-3. Reduce scan resolution for slower networks
-
-### Image Processing Issues
-
-1. Verify `pillow` library is installed:
-
-    ```bash
-    pip install --upgrade pillow
-    ```
-
-2. Check disk space for image temporary files
-3. Verify scanner outputs valid PNG/JPEG images
-
-## Error Handling
-
-```typescript
-try {
-    const scanners = await discoverScanners(5000);
-
-    if (scanners.length === 0) {
-        throw new Error('No scanners found');
-    }
-
-    const capabilities = await client.getCapabilities(scanners[0]);
-    if (!capabilities) {
-        throw new Error('Failed to get capabilities');
-    }
-
-    const jobId = await client.createScanJob(scanners[0], 300, 'RGB24', 'Platen');
-    if (!jobId) {
-        throw new Error('Failed to create scan job');
-    }
-} catch (error) {
-    console.error('eSCL operation failed:', error.message);
-    // Handle error appropriately
+interface ESCLCapabilities {
+    resolutions: number[];
+    colorModes: ("BlackAndWhite1" | "Grayscale8" | "RGB24")[];
+    sources: ("Platen" | "Adf" | "Feeder")[];
+    maxWidth?: number; // mm
+    maxHeight?: number; // mm
 }
 ```
 
-## Performance Considerations
+## Supported Scanners
 
--   **Discovery Time**: ~5 seconds for local network scan
--   **Scan Time**: Varies by document size, DPI, and network latency
-    -   Single page A4 at 300 DPI: typically 5-10 seconds
-    -   Large batch jobs: minutes depending on document count
--   **Memory Usage**: Python subprocess uses ~50-100MB when idle
--   **Network**: Requires local network access to scanners (no internet required)
+AirPrint/eSCL compatible network scanners:
 
-## Development
-
-### Building from Source
-
-```bash
-# Install dependencies
-yarn install
-
-# Build TypeScript
-yarn build
-
-# Clean build artifacts
-yarn clean
-
-# Watch mode
-yarn build:watch
-```
-
-### Project Structure
-
-```
-├── src/
-│   ├── index.ts           # Main entry point
-│   ├── types.ts           # TypeScript interfaces
-│   ├── client.ts          # eSCL HTTP client
-│   ├── discovery.ts       # Scanner discovery service
-│   └── [...other files]
-├── python/
-│   ├── escl_main.py       # Python subprocess entry point
-│   ├── escl_backend.py    # eSCL protocol implementation
-│   └── base.py            # Base class for backends
-├── dist/                  # Compiled JavaScript (generated)
-├── package.json
-└── README.md
-```
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request with description of changes
-4. Ensure tests pass and code follows project conventions
+- Canon iR-ADV series
+- HP LaserJet MFP
+- Xerox WorkCentre
+- Epson WorkForce Pro
+- Other AirPrint compatible MFPs
+- ...
 
 ## License
 
 MIT
-
-## Support
-
-For issues, questions, or feature requests:
-
--   GitHub Repository: [escl-protocol-scanner](https://github.com/byeong1/escl-protocol-scanner)
--   GitHub Issues: [Report Issues](https://github.com/byeong1/escl-protocol-scanner/issues)
--   npm Package: [@escl-protocol/scanner](https://www.npmjs.com/package/@escl-protocol/scanner)
--   Email: your-email@example.com
-
-## Changelog
-
-### Version 1.0.0 (Initial Release)
-
--   Basic eSCL protocol support
--   Scanner discovery via mDNS
--   Single and batch scanning
--   Image rotation and encoding
--   Support for multiple manufacturers
