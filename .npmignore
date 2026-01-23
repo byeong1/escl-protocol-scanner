@@ -9,6 +9,8 @@ yarn-error.log
 tsconfig.json
 .gitignore
 .npmrc
+SETUP.md
+CHANGELOG.md
 
 .venv
-__ptcache__
+__pycache__

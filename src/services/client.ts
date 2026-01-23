@@ -4,7 +4,7 @@
  */
 
 import * as http from 'http';
-import { ESCLScanner, ESCLCapabilities, ESCLResponse } from './types';
+import { IESCLScanner, IESCLCapabilities } from '../types';
 
 /**
  * eSCL HTTP Client
@@ -25,7 +25,7 @@ export class ESCLClient {
    * @param debug Enable debug logging (default: false)
    * @returns Scanner capabilities
    */
-  async getCapabilities(scanner: ESCLScanner, debug: boolean = false): Promise<ESCLCapabilities | null> {
+  async getCapabilities(scanner: IESCLScanner, debug: boolean = false): Promise<IESCLCapabilities | null> {
     try {
       const response = await this.httpGet(
         `http://${scanner.host}:${scanner.port}/eSCL/ScannerCapabilities`
@@ -50,7 +50,7 @@ export class ESCLClient {
    * @returns Scan job UUID
    */
   async createScanJob(
-    scanner: ESCLScanner,
+    scanner: IESCLScanner,
     dpi: number,
     colorMode: string,
     source: string,
@@ -101,7 +101,7 @@ export class ESCLClient {
    * @param jobId Scan job ID
    * @returns Job status and image URLs if complete
    */
-  async getScanJobStatus(scanner: ESCLScanner, jobId: string): Promise<{
+  async getScanJobStatus(scanner: IESCLScanner, jobId: string): Promise<{
     status: 'Processing' | 'Completed' | 'Aborted' | 'Unknown';
     images: string[];
   }> {
@@ -135,7 +135,7 @@ export class ESCLClient {
    * @param imageUrl Relative image URL
    * @returns PNG image data as Buffer
    */
-  async downloadImage(scanner: ESCLScanner, imageUrl: string): Promise<Buffer | null> {
+  async downloadImage(scanner: IESCLScanner, imageUrl: string): Promise<Buffer | null> {
     try {
       const fullUrl = `http://${scanner.host}:${scanner.port}${imageUrl}`;
       return await this.httpGetBinary(fullUrl);
@@ -192,7 +192,7 @@ export class ESCLClient {
    * @param xml XML response from scanner
    * @param debug Enable debug logging (default: false)
    */
-  private parseCapabilities(xml: string, debug: boolean = false): ESCLCapabilities {
+  private parseCapabilities(xml: string, debug: boolean = false): IESCLCapabilities {
     const resolutions: number[] = [];
     const colorModes: ('BlackAndWhite1' | 'Grayscale8' | 'RGB24')[] = [];
     const sources: ('Platen' | 'Adf' | 'Feeder')[] = [];

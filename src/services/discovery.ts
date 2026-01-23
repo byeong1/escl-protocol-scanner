@@ -7,16 +7,16 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
-import { execSync } from 'child_process';
-import { ESCLScanner, ESCLCommand, ESCLResponse, DiscoveryResponse } from './types';
+import {
+  IESCLScanner,
+  TESCLCommand,
+  IESCLResponse,
+  IDiscoveryResponse,
+  IESCLDiscoveryOptions,
+} from '../types';
 
-/**
- * eSCL Scanner Discovery Service Options
- */
-export interface ESCLDiscoveryOptions {
-  /** Custom Python executable path (e.g., /path/to/venv/bin/python3) */
-  pythonPath?: string;
-}
+// Re-export for convenience
+export type { IESCLDiscoveryOptions };
 
 /**
  * eSCL Scanner Discovery Service
@@ -24,14 +24,14 @@ export interface ESCLDiscoveryOptions {
  */
 export class ESCLDiscovery {
   private pythonProcess: ChildProcess | null = null;
-  private discovered: Map<string, ESCLScanner> = new Map();
-  private listeners: Set<(scanners: ESCLScanner[]) => void> = new Set();
+  private discovered: Map<string, IESCLScanner> = new Map();
+  private listeners: Set<(scanners: IESCLScanner[]) => void> = new Set();
   private timeout: number = 5000;
   private processReady: boolean = false;
   private pythonPath: string = 'python3';
   private binaryPath: string | null = null;
 
-  constructor(timeout?: number, options?: ESCLDiscoveryOptions) {
+  constructor(timeout?: number, options?: IESCLDiscoveryOptions) {
     if (timeout) {
       this.timeout = timeout;
     }
@@ -48,7 +48,7 @@ export class ESCLDiscovery {
    */
   private getBinaryPath(): string | null {
     const platform = process.platform; // 'win32', 'darwin', 'linux'
-    const binDir = path.join(__dirname, '..', 'bin', platform);
+    const binDir = path.join(__dirname, '..', '..', 'bin', platform);
     const binaryName = platform === 'win32' ? 'escl-scanner.exe' : 'escl-scanner';
     const binaryPath = path.join(binDir, binaryName);
 
@@ -96,7 +96,7 @@ export class ESCLDiscovery {
    * @param timeout Optional timeout in milliseconds (default: 5000ms)
    * @returns Promise resolving with discovery response containing success status and scanner data
    */
-  async startDiscovery(timeout?: number): Promise<DiscoveryResponse> {
+  async startDiscovery(timeout?: number): Promise<IDiscoveryResponse> {
     const discoveryTimeout = timeout || this.timeout;
 
     return new Promise((resolve, reject) => {
@@ -121,7 +121,7 @@ export class ESCLDiscovery {
         }, discoveryTimeout);
 
         // Set up listener for Python response
-        const responseHandler = (scanners: ESCLScanner[]) => {
+        const responseHandler = (scanners: IESCLScanner[]) => {
           if (!resolved) {
             resolved = true;
             clearTimeout(timeoutHandle);
@@ -139,7 +139,7 @@ export class ESCLDiscovery {
 
         // Send list command to Python subprocess
         if (this.pythonProcess && this.pythonProcess.stdin) {
-          const command: ESCLCommand = { action: 'list' };
+          const command: TESCLCommand = { action: 'list' };
           this.pythonProcess.stdin.write(JSON.stringify(command) + '\n');
         }
       } catch (error) {
@@ -158,21 +158,21 @@ export class ESCLDiscovery {
   /**
    * Get currently discovered scanners
    */
-  getScanners(): ESCLScanner[] {
+  getScanners(): IESCLScanner[] {
     return Array.from(this.discovered.values());
   }
 
   /**
    * Subscribe to scanner discovery updates
    */
-  onScannerDiscovered(callback: (scanners: ESCLScanner[]) => void): void {
+  onScannerDiscovered(callback: (scanners: IESCLScanner[]) => void): void {
     this.listeners.add(callback);
   }
 
   /**
    * Unsubscribe from scanner discovery updates
    */
-  offScannerDiscovered(callback: (scanners: ESCLScanner[]) => void): void {
+  offScannerDiscovered(callback: (scanners: IESCLScanner[]) => void): void {
     this.listeners.delete(callback);
   }
 
@@ -194,7 +194,7 @@ export class ESCLDiscovery {
         });
       } else {
         // Fall back to Python script (development environment)
-        const pythonScriptPath = path.join(__dirname, '..', 'python', 'escl_main.py');
+        const pythonScriptPath = path.join(__dirname, '..', '..', 'python', 'escl_main.py');
         console.log(`[eSCL] Using Python script: ${pythonScriptPath}`);
         this.pythonProcess = spawn(this.pythonPath, [pythonScriptPath], {
           stdio: ['pipe', 'pipe', 'pipe'],
@@ -209,7 +209,7 @@ export class ESCLDiscovery {
             const lines = data.toString().split('\n');
             for (const line of lines) {
               if (line.trim()) {
-                const response: ESCLResponse = JSON.parse(line);
+                const response: IESCLResponse = JSON.parse(line);
                 if (!response.success && response.error) {
                   // Handle error response from Python
                   console.error('[eSCL Error]', response.error);
@@ -257,7 +257,7 @@ export class ESCLDiscovery {
       try {
         // Send exit command
         if (this.pythonProcess.stdin) {
-          const command: ESCLCommand = { action: 'exit' };
+          const command: TESCLCommand = { action: 'exit' };
           this.pythonProcess.stdin.write(JSON.stringify(command) + '\n');
         }
 
@@ -296,7 +296,7 @@ export class ESCLDiscovery {
  * @param options Discovery options including pythonPath
  * @returns Discovery response with success status and scanner data
  */
-export async function discoverScanners(timeout: number = 5000, options?: ESCLDiscoveryOptions): Promise<DiscoveryResponse> {
+export async function discoverScanners(timeout: number = 5000, options?: IESCLDiscoveryOptions): Promise<IDiscoveryResponse> {
   const discovery = new ESCLDiscovery(timeout, options);
   return discovery.startDiscovery(timeout);
 }
