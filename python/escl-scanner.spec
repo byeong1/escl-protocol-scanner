@@ -10,11 +10,25 @@ from pathlib import Path
 block_cipher = None
 
 a = Analysis(
-    ['escl_main.py'],
+    ['__main__.py'],
     pathex=[],
     binaries=[],
     datas=[],
     hiddenimports=[
+        'common',
+        'common.logger',
+        'common.exceptions',
+        'common.response',
+        'base',
+        'base.service',
+        'services.scanner',
+        'decorators',
+        'decorators.scanner',
+        'services',
+        'services.escl',
+        'services.escl.protocol',
+        'services.escl.discovery',
+        'app',
         'zeroconf',
         'zeroconf._utils',
         'zeroconf._utils.ipaddress',
