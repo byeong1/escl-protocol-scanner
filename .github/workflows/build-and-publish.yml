@@ -5,13 +5,9 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (e.g., 1.0.13)'
-        required: false
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -105,3 +101,17 @@ jobs:
         run: npm publish --registry https://npm.pkg.github.com --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GIT_HUB_TOKEN }}
+
+  cleanup-on-failure:
+    needs: [build-binaries, publish]
+    if: failure() && github.ref_type == 'tag' && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete tag on failure
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "Deleting tag $TAG due to build/publish failure"
+          git push origin --delete "$TAG"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
