@@ -5,15 +5,15 @@
  * Application 인스턴스를 생성하고 export
  */
 
-import { Application } from './core/application';
+import { Application } from "./core/application";
 
 // Types - re-export all types
-export * from './types';
+export * from "./types";
 
 // Classes
-export { Application } from './core/application';
-export { ESCLClient } from './services/client';
-export { ESCLDiscovery } from './services/discovery';
+export { Application } from "./core/application";
+export { ESCLClient } from "./services/client";
+export { ESCLDiscovery } from "./services/discovery";
 
 // 기본 Application 인스턴스
 const eSCLScanner = new Application();
@@ -23,4 +23,4 @@ export { eSCLScanner };
 
 // Version (package.json에서 가져옴)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-export const VERSION: string = require('../package.json').version;
+export const VERSION: string = require("../package.json").version;
