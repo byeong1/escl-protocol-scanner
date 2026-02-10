@@ -2,12 +2,6 @@
 # yarn lockfile v1
 
 
-"@byeong1/escl-protocol-scanner@file:":
-  version "1.0.0"
-  resolved "file:"
-  dependencies:
-    "@byeong1/escl-protocol-scanner" "file:"
-
 "@types/node@^24.7.2":
   version "24.10.0"
   resolved "https://registry.npmjs.org/@types/node/-/node-24.10.0.tgz"
