@@ -259,9 +259,27 @@ class ESCLBackend(ScannerBackend):
                     'error': 'Failed to create scan job'
                 }
 
-            # 3. Wait for scan to complete (5 seconds)
-            print('[eSCL] Scan in progress... (waiting 5 seconds)', file=sys.stderr, flush=True)
-            time.sleep(5)
+            # 3. Wait for scan to complete (poll job status)
+            print('[eSCL] Scan in progress... (polling job status)', file=sys.stderr, flush=True)
+            self._status_logged = False
+            max_wait = 30
+            poll_interval = 1
+            elapsed = 0
+
+            while elapsed < max_wait:
+                status = self._check_job_status(job_url)
+                if status == 'Completed':
+                    print('[eSCL] Scan completed', file=sys.stderr, flush=True)
+                    break
+                if status in ('Aborted', 'Canceled'):
+                    return {
+                        'success': False,
+                        'error': f'Scan job {status.lower()}'
+                    }
+                time.sleep(poll_interval)
+                elapsed += poll_interval
+            else:
+                print('[eSCL] Status polling timed out, attempting download anyway', file=sys.stderr, flush=True)
 
             # 4. Download scan results (ADF can have multiple pages)
             import os
@@ -315,7 +333,7 @@ class ESCLBackend(ScannerBackend):
                     print(f'[eSCL] Page {page_num} original size: {img.size[0]}x{img.size[1]}', file=sys.stderr, flush=True)
 
                     # Rotate 90 degrees counter-clockwise
-                    img = img.transpose(Image.ROTATE_90)
+                    img = img.transpose(Image.Transpose.ROTATE_90)
                     print(f'[eSCL] Page {page_num} size after rotation: {img.size[0]}x{img.size[1]}', file=sys.stderr, flush=True)
 
                     # Save rotated image as JPEG
