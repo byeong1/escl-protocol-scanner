@@ -1,8 +1,10 @@
 # @crowsgear/escl-protocol-scanner
 
+[한국어](./README.ko.md)
+
 Network scanner library based on eSCL/AirPrint protocol.
 
-> **Note**: This library only supports network-connected scanners (WiFi or LAN). USB scanners are not supported.
+> **Note**: This library only supports network-connected scanners (WiFi or LAN). USB scanners may not be supported.
 
 ## Installation
 
@@ -13,20 +15,21 @@ yarn add @crowsgear/escl-protocol-scanner
 ```
 
 **No Python installation required!** Pre-built binaries for Windows, macOS, and Linux are included.
+You can also specify a custom Python path. See [Application (Custom Configuration)](#application-custom-configuration) for details.
 
 ## Quick Start
 
 ```typescript
 import { eSCLScanner } from '@crowsgear/escl-protocol-scanner';
 
-// 1. Discover scanners
+// 1. Discover scanners (result: IDiscoveryResponse)
 const result = await eSCLScanner.discoverScanners(10000);
 if (result.success && result.data.length > 0) {
   console.log('Found scanners:', result.data);
 }
 
-// 2. Get scanner capabilities
-const scanner = result.data[0];
+// 2. Get scanner capabilities (result.data: IESCLScanner[])
+const scanner = result.data[0]; // Select first scanner
 const capabilities = await eSCLScanner.getCapabilities(scanner);
 console.log('Resolutions:', capabilities?.resolutions);
 console.log('Color modes:', capabilities?.colorModes);
@@ -80,11 +83,14 @@ import { Application } from '@crowsgear/escl-protocol-scanner';
 
 const myScanner = new Application({
   timeout: 15000,
+  pythonPath: '/path/to/.venv/bin/python3', // Optional: Python path
   debug: true,
 });
 
 const result = await myScanner.discoverScanners();
 ```
+
+> **Note**: When `pythonPath` is provided, it takes priority over pre-built binaries.
 
 ### quickScan Parameters
 
@@ -140,19 +146,19 @@ interface IDiscoveryResponse {
 
 ## Supported Scanners
 
-AirPrint/eSCL compatible network scanners:
+Works with any network scanner or MFP that supports the eSCL (AirPrint Scan) protocol.
+Most modern network MFPs from Brother, Canon, Epson, HP, Ricoh, Xerox, and others support eSCL.
 
-- Canon iR-ADV series
-- HP LaserJet MFP
-- Xerox WorkCentre
-- Epson WorkForce Pro
-- Other AirPrint compatible MFPs
+> eSCL is a protocol designed by Apple and maintained as an industry standard by the [Mopria Alliance](https://mopria.org). For a list of compatible devices, see the [Apple AirPrint page](https://support.apple.com/en-us/102895).
+> Not all devices have been fully tested. If you encounter issues with a specific device, please [open an issue](https://github.com/crowsgear/escl-protocol-scanner/issues).
 
 ## Development
 
-For development without pre-built binaries, you can use Python directly:
+For development without pre-built binaries, Python 3 with `zeroconf` and `pillow` is required.
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install zeroconf pillow
 ```
 
@@ -165,8 +171,6 @@ const scanner = new Application({
 
 const result = await scanner.discoverScanners();
 ```
-
-> **Note**: When pre-built binaries exist, they take priority over Python scripts.
 
 ## License
 
